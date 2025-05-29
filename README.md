@@ -21,7 +21,15 @@ A powerful JavaScript library and CLI tool for parsing and manipulating markdown
 ### Global Installation (for CLI usage)
 
 ```bash
+# Using npm
 npm install -g @kayvan/markdown-tree-parser
+
+# Using pnpm (may require approval for build scripts)
+pnpm install -g @kayvan/markdown-tree-parser
+pnpm approve-builds -g  # If prompted
+
+# Using yarn
+yarn global add @kayvan/markdown-tree-parser
 ```
 
 ### Local Installation (for library usage)

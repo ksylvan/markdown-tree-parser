@@ -1,6 +1,6 @@
 {
   "name": "@kayvan/markdown-tree-parser",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures using the remark/unified ecosystem",
   "type": "module",
   "main": "index.js",
@@ -21,7 +21,6 @@
     "lint": "npx eslint .",
     "format": "npx prettier --write .",
     "prepublishOnly": "npm test",
-    "postinstall": "node -e \"console.log('✅ markdown-tree-parser installed! Try: md-tree help')\"",
     "dev": "npm link && md-tree help"
   },
   "dependencies": {
@@ -75,5 +74,7 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "preferGlobal": true,
+  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977"
 }
