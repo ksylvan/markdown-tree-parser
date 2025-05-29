@@ -279,6 +279,48 @@ npm run test:cli
 npm run example
 ```
 
+## 🔧 Development
+
+### Prerequisites
+
+- Node.js 16+
+- npm
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/ksylvan/markdown-tree-parser.git
+cd markdown-tree-parser
+
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Run linting
+npm run lint
+
+# Format code
+npm run format
+
+# Test CLI functionality
+npm run test:cli
+```
+
+### CI/CD
+
+This project uses GitHub Actions for continuous integration. The workflow automatically:
+
+- Tests against Node.js versions 16.x, 18.x, 20.x, and 22.x
+- Runs linting with ESLint
+- Executes the full test suite
+- Tests CLI functionality
+- Verifies the package can be published
+
+The CI badge in the README shows the current build status and links to the [Actions page](https://github.com/ksylvan/markdown-tree-parser/actions).
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
