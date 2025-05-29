@@ -283,7 +283,7 @@ npm run example
 
 ### Prerequisites
 
-- Node.js 16+
+- Node.js 18+
 - npm
 
 ### Setup
@@ -313,7 +313,7 @@ npm run test:cli
 
 This project uses GitHub Actions for continuous integration. The workflow automatically:
 
-- Tests against Node.js versions 16.x, 18.x, 20.x, and 22.x
+- Tests against Node.js versions 18.x, 20.x, and 22.x
 - Runs linting with ESLint
 - Executes the full test suite
 - Tests CLI functionality

@@ -25,7 +25,7 @@ Follow these steps to get started:
 
 Make sure you have the following installed:
 
-1. Node.js (version 16 or higher)
+1. Node.js (version 18 or higher)
 2. npm package manager
 3. A text editor
 

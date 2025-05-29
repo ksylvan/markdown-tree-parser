@@ -11,16 +11,17 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Check if Node.js is installed
-if ! command -v node &> /dev/null; then
+if ! command -v node &>/dev/null; then
     echo -e "${RED}❌ Node.js is not installed. Please install Node.js first.${NC}"
     echo "   Visit: https://nodejs.org/"
     exit 1
 fi
 
 # Check Node.js version
+MIN_ACCEPTED_VERSION=18
 NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 16 ]; then
-    echo -e "${RED}❌ Node.js version 16 or higher is required. Current version: $(node -v)${NC}"
+if [ "$NODE_VERSION" -lt ${MIN_ACCEPTED_VERSION} ]; then
+    echo -e "${RED}❌ Node.js version ${MIN_ACCEPTED_VERSION} or higher is required. Current version: $(node -v)${NC}"
     exit 1
 fi
 
