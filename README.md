@@ -1,7 +1,7 @@
 # markdown-tree-parser
 
 [![npm version](https://badge.fury.io/js/markdown-tree-parser.svg)](https://www.npmjs.com/package/markdown-tree-parser)
-[![Node.js CI](https://github.com/your-username/markdown-tree-parser/workflows/Node.js%20CI/badge.svg)](https://github.com/your-username/markdown-tree-parser/actions)
+[![Node.js CI](https://github.com/ksylvan/markdown-tree-parser/workflows/Node.js%20CI/badge.svg)](https://github.com/ksylvan/markdown-tree-parser/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures. Built on top of the battle-tested [remark/unified](https://github.com/remarkjs/remark) ecosystem.
@@ -303,10 +303,10 @@ Built on top of the excellent [unified](https://unifiedjs.com/) ecosystem:
 
 ## 📞 Support
 
-- 📖 [Documentation](https://github.com/your-username/markdown-tree-parser#readme)
-- 🐛 [Issue Tracker](https://github.com/your-username/markdown-tree-parser/issues)
-- 💬 [Discussions](https://github.com/your-username/markdown-tree-parser/discussions)
+- 📖 [Documentation](https://github.com/ksylvan/markdown-tree-parser#readme)
+- 🐛 [Issue Tracker](https://github.com/ksylvan/markdown-tree-parser/issues)
+- 💬 [Discussions](https://github.com/ksylvan/markdown-tree-parser/discussions)
 
 ---
 
-Made with ❤️ by [Your Name](https://github.com/your-username)
+Made with ❤️ by [Your Name](https://github.com/ksylvan)
