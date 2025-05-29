@@ -1,0 +1,14 @@
+{
+  "markdownlint.config": {
+    "MD033": {
+      "allowed_elements": [
+        "br",
+        "div",
+        "img"
+      ]
+    }
+  },
+  "markdownlint.lintWorkspaceGlobs": [
+    "**/*.md"
+  ]
+}

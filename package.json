@@ -1,0 +1,78 @@
+{
+  "name": "markdown-tree-parser",
+  "version": "1.0.0",
+  "description": "A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures using the remark/unified ecosystem",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "md-tree": "./bin/md-tree.js"
+  },
+  "files": [
+    "index.js",
+    "lib/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/test.js",
+    "test:cli": "node bin/md-tree.js tree test/sample.md",
+    "example": "node examples/usage.js",
+    "lint": "npx eslint .",
+    "format": "npx prettier --write .",
+    "prepublishOnly": "npm test",
+    "postinstall": "node -e \"console.log('✅ markdown-tree-parser installed! Try: md-tree help')\"",
+    "dev": "npm link && md-tree help"
+  },
+  "dependencies": {
+    "unified": "^11.0.5",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unist-util-visit": "^5.0.0",
+    "unist-util-select": "^5.1.0",
+    "unist-util-find": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.24",
+    "eslint": "^9.27.0",
+    "prettier": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "markdown",
+    "parser",
+    "ast",
+    "tree",
+    "remark",
+    "unified",
+    "cli",
+    "documentation",
+    "section-extraction",
+    "markdown-manipulation",
+    "content-management",
+    "mdast"
+  ],
+  "author": {
+    "name": "Kayvan Sylvan",
+    "email": "kayvan@sylvan.com",
+    "url": "https://github.com/ksylvan"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ksylvan/markdown-tree-parser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ksylvan/markdown-tree-parser/issues"
+  },
+  "homepage": "https://github.com/ksylvan/markdown-tree-parser#readme",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/ksylvan"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
