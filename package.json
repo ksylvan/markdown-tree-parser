@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "bin": {
-    "md-tree": "./bin/md-tree.js"
+    "md-tree": "bin/md-tree.js"
   },
   "files": [
     "index.js",
