@@ -1,5 +1,5 @@
 {
-  "name": "markdown-tree-parser",
+  "name": "@kayvan/markdown-tree-parser",
   "version": "1.0.0",
   "description": "A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures using the remark/unified ecosystem",
   "type": "module",

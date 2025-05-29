@@ -1,6 +1,6 @@
 # markdown-tree-parser
 
-[![npm version](https://badge.fury.io/js/markdown-tree-parser.svg)](https://www.npmjs.com/package/markdown-tree-parser)
+[![npm version](https://badge.fury.io/js/%40kayvan%2Fmarkdown-tree-parser.svg)](https://www.npmjs.com/package/@kayvan/markdown-tree-parser)
 [![Node.js CI](https://github.com/ksylvan/markdown-tree-parser/workflows/Node.js%20CI/badge.svg)](https://github.com/ksylvan/markdown-tree-parser/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,13 +21,13 @@ A powerful JavaScript library and CLI tool for parsing and manipulating markdown
 ### Global Installation (for CLI usage)
 
 ```bash
-npm install -g markdown-tree-parser
+npm install -g @kayvan/markdown-tree-parser
 ```
 
 ### Local Installation (for library usage)
 
 ```bash
-npm install markdown-tree-parser
+npm install @kayvan/markdown-tree-parser
 ```
 
 ## 🔧 CLI Usage
