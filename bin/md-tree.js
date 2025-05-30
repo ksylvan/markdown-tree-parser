@@ -460,9 +460,59 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
   }
 
   async explodeDocument(filePath, outputDir) {
+    // Use the text-based approach for perfect round-trip compatibility
+    return await this.explodeDocumentTextBased(filePath, outputDir);
+  }
+
+  // Text-based explode that preserves original formatting exactly
+  async explodeDocumentTextBased(filePath, outputDir) {
     const content = await this.readFile(filePath);
-    const tree = await this.parser.parse(content);
-    const sections = this.parser.extractAllSections(tree, 2);
+    const lines = content.split('\n');
+
+    // Find all level 2 headings and their positions
+    const sections = [];
+    let currentSection = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Check for main title (level 1)
+      if (line.match(/^# /)) {
+        if (currentSection) {
+          currentSection.endLine = i - 1;
+          sections.push(currentSection);
+        }
+        currentSection = null;
+        continue;
+      }
+
+      // Check for level 2 heading (section start)
+      if (line.match(/^## /)) {
+        if (currentSection) {
+          currentSection.endLine = i - 1;
+          sections.push(currentSection);
+        }
+
+        currentSection = {
+          headingText: line.replace(/^## /, ''),
+          startLine: i,
+          endLine: null,
+          lines: [],
+        };
+        continue;
+      }
+
+      // Add line to current section if we're in one
+      if (currentSection) {
+        currentSection.lines.push(line);
+      }
+    }
+
+    // Don't forget the last section
+    if (currentSection) {
+      currentSection.endLine = lines.length - 1;
+      sections.push(currentSection);
+    }
 
     if (sections.length === 0) {
       console.log(
@@ -481,14 +531,13 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     // Keep track of section filenames for index generation
     const sectionFiles = [];
 
-    // Extract each section to its own file (without numbered prefixes)
-    for (let i = 0; i < sections.length; i++) {
-      const section = sections[i];
+    // Extract each section to its own file
+    for (const section of sections) {
       const headingText = section.headingText;
 
-      // Decrement heading levels by 1 so the section starts at level 1
-      const adjustedTree = this.decrementHeadingLevels(section.tree);
-      const markdown = await this.parser.stringify(adjustedTree);
+      // Convert the heading to level 1 and preserve all original content
+      const sectionLines = [`# ${headingText}`, ...section.lines];
+      const sectionContent = sectionLines.join('\n');
 
       // Generate filename without numbered prefix
       const filename = `${this.sanitizeFilename(headingText)}.md`;
@@ -497,15 +546,14 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       sectionFiles.push({
         filename,
         headingText,
-        section: section.tree,
       });
 
-      await this.writeFile(outputPath, markdown);
+      await this.writeFile(outputPath, sectionContent);
       console.log(`✅ ${headingText} → ${filename}`);
     }
 
-    // Generate index.md with modified TOC
-    const indexContent = await this.generateIndexContent(tree, sectionFiles);
+    // Generate index.md with original title and TOC pointing to files
+    const indexContent = await this.generateIndexContentTextBased(content, sectionFiles);
     const indexPath = path.join(outputDir, 'index.md');
     await this.writeFile(indexPath, indexContent);
     console.log(`✅ Table of Contents → index.md`);
@@ -516,17 +564,24 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
   }
 
   async generateIndexContent(tree, sectionFiles) {
-    // Get the original TOC but modify it for file links
-    const headings = this.parser.getHeadingsList(tree);
+    // Use the text-based approach for consistency
+    // Convert the tree back to text to get the original content
+    const originalContent = await this.parser.stringify(tree);
+    return await this.generateIndexContentTextBased(originalContent, sectionFiles);
+  }
 
-    if (headings.length === 0) {
-      return '# Table of Contents\n\nNo headings found.';
+  // Generate index content preserving original spacing
+  async generateIndexContentTextBased(originalContent, sectionFiles) {
+    const lines = originalContent.split('\n');
+
+    // Find the main title
+    let mainTitle = 'Table of Contents';
+    for (const line of lines) {
+      if (line.match(/^# /)) {
+        mainTitle = line.replace(/^# /, '');
+        break;
+      }
     }
-
-    // Find the main title (level 1 heading)
-    const mainTitle = headings.find((h) => h.level === 1);
-    let toc = mainTitle ? `# ${mainTitle.text}\n\n` : '';
-    toc += '## Table of Contents\n\n';
 
     // Create a map of section names to filenames for quick lookup
     const sectionMap = new Map();
@@ -534,41 +589,15 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       sectionMap.set(file.headingText.toLowerCase(), file.filename);
     });
 
-    headings.forEach((heading) => {
-      const indent = '  '.repeat(Math.max(0, heading.level - 1));
-      const link = heading.text
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
+    // Start with title and TOC heading, preserving original spacing
+    let toc = `# ${mainTitle}\n\n## Table of Contents\n\n`;
 
-      let linkTarget;
+    // Add the main title link
+    toc += `- [${mainTitle}](#table-of-contents)\n`;
 
-      if (heading.level === 1) {
-        // Main title should link to table of contents
-        linkTarget = '#table-of-contents';
-      } else if (heading.level === 2) {
-        // Level 2 headings link to their individual files
-        const filename = sectionMap.get(heading.text.toLowerCase());
-        linkTarget = filename ? `./${filename}` : `#${link}`;
-      } else {
-        // Sub-headings link to sections within their parent file
-        // Find the parent level 2 heading
-        const parentHeading = this.findParentLevel2Heading(headings, heading);
-        if (parentHeading) {
-          const parentFilename = sectionMap.get(
-            parentHeading.text.toLowerCase()
-          );
-          linkTarget = parentFilename
-            ? `./${parentFilename}#${link}`
-            : `#${link}`;
-        } else {
-          linkTarget = `#${link}`;
-        }
-      }
-
-      toc += `${indent}- [${heading.text}](${linkTarget})\n`;
+    // Add links for each section
+    sectionFiles.forEach((file) => {
+      toc += `  - [${file.headingText}](./${file.filename})\n`;
     });
 
     return toc;
@@ -645,7 +674,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     // Check if index.md exists
     try {
       await fs.access(indexPath);
-    } catch (_error) {
+    } catch {
       console.error(`❌ index.md not found in ${inputDir}`);
       process.exit(1);
     }
@@ -675,7 +704,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     console.log(`📖 Found ${sectionFiles.length} sections to assemble`);
 
     // Start building the reassembled document
-    let assembledContent = `# ${mainTitle.text}\n\n`;
+    let assembledContent = `# ${mainTitle.text}\n`;
 
     // Process each section file
     for (const sectionFile of sectionFiles) {
@@ -684,15 +713,16 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       const filePath = path.join(inputDir, sectionFile.filename);
       try {
         const sectionContent = await this.readFile(filePath);
-        const sectionTree = await this.parser.parse(sectionContent);
 
-        // Increment heading levels by 1 to restore original structure
-        const adjustedTree = this.incrementHeadingLevels(sectionTree);
-        const sectionMarkdown = await this.parser.stringify(adjustedTree);
+        // Work directly with text to preserve formatting
+        const adjustedContent =
+          this.incrementHeadingLevelsInText(sectionContent);
 
-        // Remove the leading heading since it will be a level 2 now
-        assembledContent += sectionMarkdown + '\n\n';
-      } catch (_error) {
+        // Add the section content:
+        // - After main title: blank line then content (original has blank line after title)
+        // - Between sections: direct concatenation (original has no spacing between sections)
+        assembledContent += '\n' + adjustedContent;
+      } catch {
         console.error(
           `⚠️  Warning: Could not read ${sectionFile.filename}, skipping...`
         );
@@ -700,8 +730,33 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     }
 
     // Write the assembled document
-    await this.writeFile(outputFile, assembledContent.trim());
+    await this.writeFile(outputFile, assembledContent);
     console.log(`\n✨ Document assembled to ${outputFile}`);
+  }  // New method to increment heading levels directly in text without AST roundtrip
+  incrementHeadingLevelsInText(content) {
+    const lines = content.split('\n');
+    let isFirstHeading = true;
+
+    const adjustedLines = lines.map((line) => {
+      // Check if line is a heading (starts with #)
+      const headingMatch = line.match(/^(#{1,6})(\s+.*)$/);
+      if (headingMatch) {
+        const [, hashes, rest] = headingMatch;
+
+        // Only increment the first heading (the main section heading)
+        // This converts the level 1 section heading back to level 2
+        if (isFirstHeading && hashes === '#') {
+          isFirstHeading = false;
+          return '##' + rest;
+        }
+
+        // All other headings remain at their current level
+        return line;
+      }
+      return line;
+    });
+
+    return adjustedLines.join('\n');
   }
 
   async extractSectionFilesFromTOC(indexTree) {
