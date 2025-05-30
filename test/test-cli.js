@@ -243,7 +243,7 @@ async function runTests() {
     const introPath = path.join(outputDir, 'introduction.md');
     const introContent = await fs.readFile(introPath, 'utf-8');
     assert(
-      introContent.includes('## Introduction'),
+      introContent.includes('# Introduction'),
       'Introduction file should have section heading'
     );
     assert(
@@ -251,7 +251,7 @@ async function runTests() {
       'Should have section content'
     );
     assert(
-      introContent.includes('### Background'),
+      introContent.includes('## Background'),
       'Should include subsections'
     );
 
@@ -259,7 +259,7 @@ async function runTests() {
     const installPath = path.join(outputDir, 'installation.md');
     const installContent = await fs.readFile(installPath, 'utf-8');
     assert(
-      installContent.includes('## Installation'),
+      installContent.includes('# Installation'),
       'Installation file should have section heading'
     );
     assert(
@@ -267,7 +267,7 @@ async function runTests() {
       'Should have section content'
     );
     assert(
-      installContent.includes('### Prerequisites'),
+      installContent.includes('## Prerequisites'),
       'Should include subsections'
     );
     assert(

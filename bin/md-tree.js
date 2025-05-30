@@ -472,7 +472,10 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
       const headingText = section.headingText;
-      const markdown = await this.parser.stringify(section.tree);
+
+      // Decrement heading levels by 1 so the section starts at level 1
+      const adjustedTree = this.decrementHeadingLevels(section.tree);
+      const markdown = await this.parser.stringify(adjustedTree);
 
       // Generate filename without numbered prefix
       const filename = `${this.sanitizeFilename(headingText)}.md`;
@@ -573,6 +576,30 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     }
 
     return null;
+  }
+
+  // Helper method to decrement all heading levels in a tree by 1
+  decrementHeadingLevels(tree) {
+    if (!tree || !tree.children) return tree;
+
+    // Create a deep copy to avoid modifying the original tree
+    const clonedTree = JSON.parse(JSON.stringify(tree));
+
+    const decrementNode = (node) => {
+      if (node.type === 'heading' && node.depth > 1) {
+        node.depth = node.depth - 1;
+      }
+
+      if (node.children) {
+        node.children.forEach(decrementNode);
+      }
+    };
+
+    if (clonedTree.children) {
+      clonedTree.children.forEach(decrementNode);
+    }
+
+    return clonedTree;
   }
 }
 
