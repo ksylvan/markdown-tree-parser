@@ -715,7 +715,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
         }
       } else if (heading.level > 2 && currentLevel2Filename) {
         // This is a subsection within a level 2 section
-        const indent = '    '.repeat(heading.level - 2);
+        const indent = '  '.repeat(heading.level - 1);
         const anchor = this.createAnchor(heading.text);
         toc += `${indent}- [${heading.text}](./${currentLevel2Filename}#${anchor})\n`;
       }
