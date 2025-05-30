@@ -1,6 +1,6 @@
 # markdown-tree-parser
 
-[![npm version](https://badge.fury.io/js/%40kayvan%2Fmarkdown-tree-parser.svg)](https://www.npmjs.com/package/@kayvan/markdown-tree-parser)
+[![npm version](https://img.shields.io/npm/v/@kayvan/markdown-tree-parser)](https://www.npmjs.com/package/@kayvan/markdown-tree-parser)
 [![Node.js CI](https://github.com/ksylvan/markdown-tree-parser/workflows/Node.js%20CI/badge.svg)](https://github.com/ksylvan/markdown-tree-parser/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -359,4 +359,4 @@ Built on top of the excellent [unified](https://unifiedjs.com/) ecosystem:
 
 ---
 
-Made with ❤️ by [Your Name](https://github.com/ksylvan)
+Made with ❤️ by [Kayvan Sylvan](https://github.com/ksylvan)

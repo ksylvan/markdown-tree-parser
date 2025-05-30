@@ -1,6 +1,6 @@
 {
   "name": "@kayvan/markdown-tree-parser",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures using the remark/unified ecosystem",
   "type": "module",
   "main": "index.js",
@@ -24,16 +24,16 @@
     "dev": "npm link && md-tree help"
   },
   "dependencies": {
-    "unified": "^11.0.5",
     "remark-parse": "^11.0.0",
     "remark-stringify": "^11.0.0",
-    "unist-util-visit": "^5.0.0",
+    "unified": "^11.0.5",
+    "unist-util-find": "^3.0.0",
     "unist-util-select": "^5.1.0",
-    "unist-util-find": "^3.0.0"
+    "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
-    "@types/node": "^22.15.24",
+    "@types/node": "^22.15.26",
     "eslint": "^9.27.0",
     "prettier": "^3.5.3"
   },
