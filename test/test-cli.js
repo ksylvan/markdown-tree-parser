@@ -155,10 +155,10 @@ async function runTests() {
 
   const testFile = await setupTests();
 
-  // Test explode-doc command
-  await test('CLI explode-doc command', async () => {
+  // Test explode command
+  await test('CLI explode command', async () => {
     const outputDir = path.join(testDir, 'exploded');
-    const result = await runCLI(['explode-doc', testFile, outputDir]);
+    const result = await runCLI(['explode', testFile, outputDir]);
 
     assert(
       result.code === 0,
@@ -189,7 +189,7 @@ async function runTests() {
     );
   });
 
-  await test('CLI explode-doc index.md content', async () => {
+  await test('CLI explode index.md content', async () => {
     const outputDir = path.join(testDir, 'exploded');
     const indexPath = path.join(outputDir, 'index.md');
     const indexContent = await fs.readFile(indexPath, 'utf-8');
@@ -236,7 +236,7 @@ async function runTests() {
     );
   });
 
-  await test('CLI explode-doc individual files', async () => {
+  await test('CLI explode individual files', async () => {
     const outputDir = path.join(testDir, 'exploded');
 
     // Check introduction.md
@@ -276,9 +276,9 @@ async function runTests() {
     );
   });
 
-  await test('CLI explode-doc error handling', async () => {
+  await test('CLI explode error handling', async () => {
     // Test with non-existent file
-    const result = await runCLI(['explode-doc', 'non-existent.md', testDir]);
+    const result = await runCLI(['explode', 'non-existent.md', testDir]);
     assert(result.code !== 0, 'Should fail with non-existent file');
     assert(
       result.stderr.includes('Error reading file'),
@@ -286,24 +286,21 @@ async function runTests() {
     );
   });
 
-  await test('CLI explode-doc usage help', async () => {
+  await test('CLI explode usage help', async () => {
     // Test with missing arguments
-    const result = await runCLI(['explode-doc']);
+    const result = await runCLI(['explode']);
     assert(result.code !== 0, 'Should fail with missing arguments');
     assert(
-      result.stderr.includes('Usage: md-tree explode-doc'),
+      result.stderr.includes('Usage: md-tree explode'),
       'Should show usage message'
     );
   });
 
-  // Test that help includes explode-doc
-  await test('CLI help includes explode-doc', async () => {
+  // Test that help includes explode
+  await test('CLI help includes explode', async () => {
     const result = await runCLI(['help']);
     assert(result.code === 0, 'Help command should succeed');
-    assert(
-      result.stdout.includes('explode-doc'),
-      'Help should mention explode-doc'
-    );
+    assert(result.stdout.includes('explode'), 'Help should mention explode');
     assert(
       result.stdout.includes('Extract all level 2 sections and create index'),
       'Should have description'

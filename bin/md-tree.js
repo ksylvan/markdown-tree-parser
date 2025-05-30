@@ -69,28 +69,30 @@ class MarkdownCLI {
 Usage: md-tree <command> <file> [options]
 
 Commands:
-  list <file>                      List all headings in the file
-  extract <file> <heading>         Extract a specific section by heading text
-  extract-all <file> [level]       Extract all sections at level (default: 2)
-  explode-doc <file> <output-dir>  Extract all level 2 sections and create index
-  tree <file>                      Show the document structure as a tree
-  search <file> <selector>         Search using CSS-like selectors
-  stats <file>                     Show document statistics
-  toc <file>                       Generate table of contents
-  version                          Show version information
-  help                             Show this help message
+  list <file>                   List all headings in the file
+  extract <file> <heading>      Extract a specific section by heading text
+  extract-all <file> [level]    Extract all sections at level (default: 2)
+  explode <file> <output-dir>   Extract all level 2 sections and create index
+  assemble <dir> <output-file>  Reassemble exploded document from directory
+  tree <file>                   Show the document structure as a tree
+  search <file> <selector>      Search using CSS-like selectors
+  stats <file>                  Show document statistics
+  toc <file>                    Generate table of contents
+  version                       Show version information
+  help                          Show this help message
 
 Options:
-  --output, -o <dir>              Output directory for extracted files
-  --level, -l <number>            Heading level to work with
-  --format, -f <json|text>        Output format (default: text)
-  --max-level <number>            Maximum heading level for TOC (default: 3)
+  --output, -o <dir>            Output directory for extracted files
+  --level, -l <number>          Heading level to work with
+  --format, -f <json|text>      Output format (default: text)
+  --max-level <number>          Maximum heading level for TOC (default: 3)
 
 Examples:
   md-tree list README.md
   md-tree extract README.md "Installation"
   md-tree extract-all README.md 2 --output ./sections
-  md-tree explode-doc README.md ./exploded
+  md-tree explode README.md ./exploded
+  md-tree assemble ./exploded reassembled.md
   md-tree tree README.md
   md-tree search README.md "heading[depth=2]"
   md-tree stats README.md
@@ -389,14 +391,25 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
           break;
         }
 
-        case 'explode-doc': {
+        case 'explode': {
           if (args.length < 3) {
             console.error(
-              '❌ Usage: md-tree explode-doc <file> <output-directory>'
+              '❌ Usage: md-tree explode <file> <output-directory>'
             );
             process.exit(1);
           }
           await this.explodeDocument(args[1], args[2]);
+          break;
+        }
+
+        case 'assemble': {
+          if (args.length < 3) {
+            console.error(
+              '❌ Usage: md-tree assemble <directory> <output-file>'
+            );
+            process.exit(1);
+          }
+          await this.assembleDocument(args[1], args[2]);
           break;
         }
 
@@ -601,8 +614,129 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     return clonedTree;
   }
+
+  // Helper method to increment all heading levels in a tree by 1
+  incrementHeadingLevels(tree) {
+    if (!tree || !tree.children) return tree;
+
+    // Create a deep copy to avoid modifying the original tree
+    const clonedTree = JSON.parse(JSON.stringify(tree));
+
+    const incrementNode = (node) => {
+      if (node.type === 'heading' && node.depth < 6) {
+        node.depth = node.depth + 1;
+      }
+
+      if (node.children) {
+        node.children.forEach(incrementNode);
+      }
+    };
+
+    if (clonedTree.children) {
+      clonedTree.children.forEach(incrementNode);
+    }
+
+    return clonedTree;
+  }
+
+  async assembleDocument(inputDir, outputFile) {
+    const indexPath = path.join(inputDir, 'index.md');
+
+    // Check if index.md exists
+    try {
+      await fs.access(indexPath);
+    } catch (_error) {
+      console.error(`❌ index.md not found in ${inputDir}`);
+      process.exit(1);
+    }
+
+    const indexContent = await this.readFile(indexPath);
+    const indexTree = await this.parser.parse(indexContent);
+
+    // Extract the main title and get the list of section files from TOC
+    const headings = this.parser.getHeadingsList(indexTree);
+    const mainTitle = headings.find((h) => h.level === 1);
+
+    if (!mainTitle) {
+      console.error('❌ No main title found in index.md');
+      process.exit(1);
+    }
+
+    console.log(`\n📚 Assembling document: ${mainTitle.text}`);
+
+    // Parse the TOC to extract section file references
+    const sectionFiles = await this.extractSectionFilesFromTOC(indexTree);
+
+    if (sectionFiles.length === 0) {
+      console.error('❌ No section files found in TOC');
+      process.exit(1);
+    }
+
+    console.log(`📖 Found ${sectionFiles.length} sections to assemble`);
+
+    // Start building the reassembled document
+    let assembledContent = `# ${mainTitle.text}\n\n`;
+
+    // Process each section file
+    for (const sectionFile of sectionFiles) {
+      console.log(`✅ Processing ${sectionFile.filename}...`);
+
+      const filePath = path.join(inputDir, sectionFile.filename);
+      try {
+        const sectionContent = await this.readFile(filePath);
+        const sectionTree = await this.parser.parse(sectionContent);
+
+        // Increment heading levels by 1 to restore original structure
+        const adjustedTree = this.incrementHeadingLevels(sectionTree);
+        const sectionMarkdown = await this.parser.stringify(adjustedTree);
+
+        // Remove the leading heading since it will be a level 2 now
+        assembledContent += sectionMarkdown + '\n\n';
+      } catch (_error) {
+        console.error(
+          `⚠️  Warning: Could not read ${sectionFile.filename}, skipping...`
+        );
+      }
+    }
+
+    // Write the assembled document
+    await this.writeFile(outputFile, assembledContent.trim());
+    console.log(`\n✨ Document assembled to ${outputFile}`);
+  }
+
+  async extractSectionFilesFromTOC(indexTree) {
+    // Convert the tree back to markdown to parse the TOC links
+    const indexMarkdown = await this.parser.stringify(indexTree);
+    const lines = indexMarkdown.split('\n');
+
+    const sectionFiles = [];
+    const processedFiles = new Set();
+
+    for (const line of lines) {
+      // Look for TOC lines that reference files (not just anchors)
+      const match = line.match(/\[([^\]]+)\]\(\.\/([^#)]+)(?:#[^)]*)?\)/);
+      if (match) {
+        const [, linkText, filename] = match;
+
+        // Only include level 2 sections (main sections, not sub-sections)
+        // Level 2 items have exactly 2 spaces before the dash (are children of main heading)
+        // Level 3+ items have 4+ spaces (are nested deeper)
+        if (line.match(/^ {2}[-*] \[/) && !processedFiles.has(filename)) {
+          sectionFiles.push({
+            filename,
+            title: linkText,
+          });
+          processedFiles.add(filename);
+        }
+      }
+    }
+
+    return sectionFiles;
+  }
 }
 
-// Run CLI
+// Export the class for testing
+export { MarkdownCLI };
+
 const cli = new MarkdownCLI();
 cli.run();
