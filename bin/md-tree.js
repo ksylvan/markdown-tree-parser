@@ -535,8 +535,8 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     for (const section of sections) {
       const headingText = section.headingText;
 
-      // Convert the heading to level 1 and preserve all original content
-      const sectionLines = [`# ${headingText}`, ...section.lines];
+      // Keep the heading at level 2 for proper document structure
+      const sectionLines = [`## ${headingText}`, ...section.lines];
       const sectionContent = sectionLines.join('\n');
 
       // Generate filename without numbered prefix
@@ -552,8 +552,12 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       console.log(`✅ ${headingText} → ${filename}`);
     }
 
-    // Generate index.md with original title and TOC pointing to files
-    const indexContent = await this.generateIndexContentTextBased(content, sectionFiles);
+    // Parse content with AST to generate rich TOC with all subsections
+    const tree = await this.parser.parse(content);
+    const indexContent = await this.generateIndexContentWithSubsections(
+      tree,
+      sectionFiles
+    );
     const indexPath = path.join(outputDir, 'index.md');
     await this.writeFile(indexPath, indexContent);
     console.log(`✅ Table of Contents → index.md`);
@@ -564,10 +568,90 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
   }
 
   async generateIndexContent(tree, sectionFiles) {
-    // Use the text-based approach for consistency
-    // Convert the tree back to text to get the original content
-    const originalContent = await this.parser.stringify(tree);
-    return await this.generateIndexContentTextBased(originalContent, sectionFiles);
+    // Use the enhanced AST-based approach to include all subsections
+    return await this.generateIndexContentWithSubsections(tree, sectionFiles);
+  }
+
+  // Enhanced index generation with all subsections using AST
+  async generateIndexContentWithSubsections(tree, sectionFiles) {
+    const headings = this.parser.getHeadingsList(tree);
+    const mainTitle = headings.find((h) => h.level === 1);
+
+    if (!mainTitle) {
+      return await this.generateIndexContentTextBased(
+        await this.parser.stringify(tree),
+        sectionFiles
+      );
+    }
+
+    // Create a map of section names to filenames for quick lookup
+    const sectionMap = new Map();
+    sectionFiles.forEach((file) => {
+      sectionMap.set(file.headingText.toLowerCase(), file.filename);
+    });
+
+    // Start with title and TOC heading
+    let toc = `# ${mainTitle.text}\n\n## Table of Contents\n\n`;
+
+    // Add the main title link
+    toc += `- [${mainTitle.text}](#table-of-contents)\n`;
+
+    // Process all headings to create nested TOC
+    let currentLevel2Filename = null;
+
+    for (const heading of headings) {
+      // Skip the main title (level 1)
+      if (heading.level === 1) {
+        continue;
+      }
+
+      if (heading.level === 2) {
+        // This is a main section
+        currentLevel2Filename = sectionMap.get(heading.text.toLowerCase());
+
+        if (currentLevel2Filename) {
+          toc += `  - [${heading.text}](./${currentLevel2Filename})\n`;
+        } else {
+          toc += `  - [${heading.text}](#${this.createAnchor(heading.text)})\n`;
+        }
+      } else if (heading.level > 2 && currentLevel2Filename) {
+        // This is a subsection within a level 2 section
+        const indent = '    '.repeat(heading.level - 2);
+        const anchor = this.createAnchor(heading.text);
+        toc += `${indent}- [${heading.text}](./${currentLevel2Filename}#${anchor})\n`;
+      }
+    }
+
+    return toc;
+  }
+
+  // Helper to create URL-friendly anchors
+  createAnchor(text) {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  // Method to decrement ALL heading levels in text (shift all headings down one level)
+  decrementAllHeadingLevelsInText(content) {
+    const lines = content.split('\n');
+
+    const adjustedLines = lines.map((line) => {
+      // Check if line is a heading (starts with #)
+      const headingMatch = line.match(/^(#{1,5})(\s+.*)$/);
+      if (headingMatch) {
+        const [, hashes, rest] = headingMatch;
+        // Add one more # to decrease the level (level 1 becomes level 2, etc.)
+        // Only do this for levels 1-5 to avoid going beyond level 6
+        return '#' + hashes + rest;
+      }
+      return line;
+    });
+
+    return adjustedLines.join('\n');
   }
 
   // Generate index content preserving original spacing
@@ -714,14 +798,10 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       try {
         const sectionContent = await this.readFile(filePath);
 
-        // Work directly with text to preserve formatting
-        const adjustedContent =
-          this.incrementHeadingLevelsInText(sectionContent);
-
-        // Add the section content:
+        // Add the section content directly - exploded files already have correct heading levels
         // - After main title: blank line then content (original has blank line after title)
         // - Between sections: direct concatenation (original has no spacing between sections)
-        assembledContent += '\n' + adjustedContent;
+        assembledContent += '\n' + sectionContent;
       } catch {
         console.error(
           `⚠️  Warning: Could not read ${sectionFile.filename}, skipping...`
@@ -732,25 +812,21 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     // Write the assembled document
     await this.writeFile(outputFile, assembledContent);
     console.log(`\n✨ Document assembled to ${outputFile}`);
-  }  // New method to increment heading levels directly in text without AST roundtrip
+  } // Method to increment ALL heading levels directly in text (shift all headings up one level)
   incrementHeadingLevelsInText(content) {
     const lines = content.split('\n');
-    let isFirstHeading = true;
 
     const adjustedLines = lines.map((line) => {
       // Check if line is a heading (starts with #)
       const headingMatch = line.match(/^(#{1,6})(\s+.*)$/);
       if (headingMatch) {
         const [, hashes, rest] = headingMatch;
-
-        // Only increment the first heading (the main section heading)
-        // This converts the level 1 section heading back to level 2
-        if (isFirstHeading && hashes === '#') {
-          isFirstHeading = false;
-          return '##' + rest;
+        // Remove one # to increase the level (level 2 becomes level 1, etc.)
+        // Only do this for levels 2-6 to avoid going below level 1
+        if (hashes.length > 1) {
+          return hashes.slice(1) + rest;
         }
-
-        // All other headings remain at their current level
+        // If it's already level 1, keep it at level 1 (can't go higher)
         return line;
       }
       return line;
