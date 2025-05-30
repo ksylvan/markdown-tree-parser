@@ -535,9 +535,20 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     for (const section of sections) {
       const headingText = section.headingText;
 
-      // Keep the heading at level 2 for proper document structure
-      const sectionLines = [`## ${headingText}`, ...section.lines];
-      const sectionContent = sectionLines.join('\n');
+      // Make main section heading Level 1, and decrement all subsection headings by one level
+      const decrementedLines = section.lines.map((line) => {
+        // Check if line is a heading (starts with #)
+        const headingMatch = line.match(/^(#{2,6})(\s+.*)$/);
+        if (headingMatch) {
+          const [, hashes, rest] = headingMatch;
+          // Remove one # to decrease the level (level 3 becomes level 2, etc.)
+          return hashes.slice(1) + rest;
+        }
+        return line;
+      });
+
+      const sectionLines = [`# ${headingText}`, ...decrementedLines];
+      const adjustedContent = sectionLines.join('\n');
 
       // Generate filename without numbered prefix
       const filename = `${this.sanitizeFilename(headingText)}.md`;
@@ -548,7 +559,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
         headingText,
       });
 
-      await this.writeFile(outputPath, sectionContent);
+      await this.writeFile(outputPath, adjustedContent);
       console.log(`✅ ${headingText} → ${filename}`);
     }
 
@@ -798,10 +809,14 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       try {
         const sectionContent = await this.readFile(filePath);
 
-        // Add the section content directly - exploded files already have correct heading levels
+        // Increment all heading levels back up to match original document structure
+        const adjustedContent =
+          this.incrementHeadingLevelsInText(sectionContent);
+
+        // Add the section content:
         // - After main title: blank line then content (original has blank line after title)
         // - Between sections: direct concatenation (original has no spacing between sections)
-        assembledContent += '\n' + sectionContent;
+        assembledContent += '\n' + adjustedContent;
       } catch {
         console.error(
           `⚠️  Warning: Could not read ${sectionFile.filename}, skipping...`
@@ -818,16 +833,12 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     const adjustedLines = lines.map((line) => {
       // Check if line is a heading (starts with #)
-      const headingMatch = line.match(/^(#{1,6})(\s+.*)$/);
+      const headingMatch = line.match(/^(#{1,5})(\s+.*)$/);
       if (headingMatch) {
         const [, hashes, rest] = headingMatch;
-        // Remove one # to increase the level (level 2 becomes level 1, etc.)
-        // Only do this for levels 2-6 to avoid going below level 1
-        if (hashes.length > 1) {
-          return hashes.slice(1) + rest;
-        }
-        // If it's already level 1, keep it at level 1 (can't go higher)
-        return line;
+        // Add one more # to increment the level (level 1 becomes level 2, etc.)
+        // Only do this for levels 1-5 to avoid going beyond level 6
+        return '#' + hashes + rest;
       }
       return line;
     });
