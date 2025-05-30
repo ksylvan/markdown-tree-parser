@@ -69,15 +69,16 @@ class MarkdownCLI {
 Usage: md-tree <command> <file> [options]
 
 Commands:
-  list <file>                     List all headings in the file
-  extract <file> <heading>        Extract a specific section by heading text
-  extract-all <file> [level]      Extract all sections at level (default: 2)
-  tree <file>                     Show the document structure as a tree
-  search <file> <selector>        Search using CSS-like selectors
-  stats <file>                    Show document statistics
-  toc <file>                      Generate table of contents
-  version                         Show version information
-  help                            Show this help message
+  list <file>                      List all headings in the file
+  extract <file> <heading>         Extract a specific section by heading text
+  extract-all <file> [level]       Extract all sections at level (default: 2)
+  explode-doc <file> <output-dir>  Extract all level 2 sections and create index
+  tree <file>                      Show the document structure as a tree
+  search <file> <selector>         Search using CSS-like selectors
+  stats <file>                     Show document statistics
+  toc <file>                       Generate table of contents
+  version                          Show version information
+  help                             Show this help message
 
 Options:
   --output, -o <dir>              Output directory for extracted files
@@ -89,6 +90,7 @@ Examples:
   md-tree list README.md
   md-tree extract README.md "Installation"
   md-tree extract-all README.md 2 --output ./sections
+  md-tree explode-doc README.md ./exploded
   md-tree tree README.md
   md-tree search README.md "heading[depth=2]"
   md-tree stats README.md
@@ -387,6 +389,17 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
           break;
         }
 
+        case 'explode-doc': {
+          if (args.length < 3) {
+            console.error(
+              '❌ Usage: md-tree explode-doc <file> <output-directory>'
+            );
+            process.exit(1);
+          }
+          await this.explodeDocument(args[1], args[2]);
+          break;
+        }
+
         case 'tree':
           if (args.length < 2) {
             console.error('❌ Usage: md-tree tree <file>');
@@ -431,6 +444,135 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       }
       process.exit(1);
     }
+  }
+
+  async explodeDocument(filePath, outputDir) {
+    const content = await this.readFile(filePath);
+    const tree = await this.parser.parse(content);
+    const sections = this.parser.extractAllSections(tree, 2);
+
+    if (sections.length === 0) {
+      console.log(
+        `⚠️  No sections found at level 2 in ${path.basename(filePath)}`
+      );
+      return;
+    }
+
+    // Create output directory
+    await fs.mkdir(outputDir, { recursive: true });
+
+    console.log(
+      `\n📚 Exploding ${sections.length} sections from ${path.basename(filePath)} to ${outputDir}:\n`
+    );
+
+    // Keep track of section filenames for index generation
+    const sectionFiles = [];
+
+    // Extract each section to its own file (without numbered prefixes)
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+      const headingText = section.headingText;
+      const markdown = await this.parser.stringify(section.tree);
+
+      // Generate filename without numbered prefix
+      const filename = `${this.sanitizeFilename(headingText)}.md`;
+      const outputPath = path.join(outputDir, filename);
+
+      sectionFiles.push({
+        filename,
+        headingText,
+        section: section.tree,
+      });
+
+      await this.writeFile(outputPath, markdown);
+      console.log(`✅ ${headingText} → ${filename}`);
+    }
+
+    // Generate index.md with modified TOC
+    const indexContent = await this.generateIndexContent(tree, sectionFiles);
+    const indexPath = path.join(outputDir, 'index.md');
+    await this.writeFile(indexPath, indexContent);
+    console.log(`✅ Table of Contents → index.md`);
+
+    console.log(
+      `\n✨ Document exploded to ${outputDir} (${sectionFiles.length + 1} files)`
+    );
+  }
+
+  async generateIndexContent(tree, sectionFiles) {
+    // Get the original TOC but modify it for file links
+    const headings = this.parser.getHeadingsList(tree);
+
+    if (headings.length === 0) {
+      return '# Table of Contents\n\nNo headings found.';
+    }
+
+    // Find the main title (level 1 heading)
+    const mainTitle = headings.find((h) => h.level === 1);
+    let toc = mainTitle ? `# ${mainTitle.text}\n\n` : '';
+    toc += '## Table of Contents\n\n';
+
+    // Create a map of section names to filenames for quick lookup
+    const sectionMap = new Map();
+    sectionFiles.forEach((file) => {
+      sectionMap.set(file.headingText.toLowerCase(), file.filename);
+    });
+
+    headings.forEach((heading) => {
+      const indent = '  '.repeat(Math.max(0, heading.level - 1));
+      const link = heading.text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      let linkTarget;
+
+      if (heading.level === 1) {
+        // Main title should link to table of contents
+        linkTarget = '#table-of-contents';
+      } else if (heading.level === 2) {
+        // Level 2 headings link to their individual files
+        const filename = sectionMap.get(heading.text.toLowerCase());
+        linkTarget = filename ? `./${filename}` : `#${link}`;
+      } else {
+        // Sub-headings link to sections within their parent file
+        // Find the parent level 2 heading
+        const parentHeading = this.findParentLevel2Heading(headings, heading);
+        if (parentHeading) {
+          const parentFilename = sectionMap.get(
+            parentHeading.text.toLowerCase()
+          );
+          linkTarget = parentFilename
+            ? `./${parentFilename}#${link}`
+            : `#${link}`;
+        } else {
+          linkTarget = `#${link}`;
+        }
+      }
+
+      toc += `${indent}- [${heading.text}](${linkTarget})\n`;
+    });
+
+    return toc;
+  }
+
+  findParentLevel2Heading(headings, targetHeading) {
+    const targetIndex = headings.indexOf(targetHeading);
+
+    // Look backwards for the most recent level 2 heading
+    for (let i = targetIndex - 1; i >= 0; i--) {
+      if (headings[i].level === 2) {
+        return headings[i];
+      }
+      // If we hit a level 1 heading, stop looking
+      if (headings[i].level === 1) {
+        break;
+      }
+    }
+
+    return null;
   }
 }
 

@@ -1,5 +1,6 @@
 {
     "words": [
         "mdast"
-    ]
+    ],
+    "ignorePaths": ["node_modules", ".gitignore"]
 }
