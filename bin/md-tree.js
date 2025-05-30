@@ -14,6 +14,45 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(__dirname, '..', 'package.json');
 
+// Constants
+const PATTERNS = {
+  HEADING: /^(#{1,6})(\s+.*)$/,
+  HEADING_LEVEL_1_5: /^(#{1,5})(\s+.*)$/,
+  LEVEL_1_HEADING: /^# /,
+  LEVEL_2_HEADING: /^## /,
+  TOC_LINK: /\[([^\]]+)\]\(\.\/([^#)]+)(?:#[^)]*)?\)/,
+  LEVEL_2_TOC_ITEM: /^ {2}[-*] \[/,
+};
+
+const LIMITS = {
+  MAX_HEADING_LEVEL: 6,
+  MIN_HEADING_LEVEL: 1,
+  MAX_HEADING_LEVEL_FOR_ADJUSTMENT: 5,
+};
+
+const MESSAGES = {
+  FILE_NOT_FOUND: '❌ File not found',
+  WRITE_SUCCESS: '✅ Written to',
+  PROCESSING: '✅ Processing',
+  NO_SECTIONS_FOUND: '⚠️  No sections found',
+  WARNING: '⚠️  Warning',
+  ERROR: '❌ Error',
+  USAGE_LIST: '❌ Usage: md-tree list <file>',
+  USAGE_EXTRACT: '❌ Usage: md-tree extract <file> <heading>',
+  USAGE_EXTRACT_ALL: '❌ Usage: md-tree extract-all <file> [level]',
+  USAGE_EXPLODE: '❌ Usage: md-tree explode <file> <output-directory>',
+  USAGE_ASSEMBLE: '❌ Usage: md-tree assemble <directory> <output-file>',
+  USAGE_TREE: '❌ Usage: md-tree tree <file>',
+  USAGE_SEARCH: '❌ Usage: md-tree search <file> <selector>',
+  USAGE_STATS: '❌ Usage: md-tree stats <file>',
+  USAGE_TOC: '❌ Usage: md-tree toc <file>',
+  INDEX_NOT_FOUND: 'index.md not found in',
+  NO_MAIN_TITLE: 'No main title found in index.md',
+  NO_SECTION_FILES: 'No section files found in TOC',
+  SECTION_ARROW: '→',
+  TOC_CREATED: 'Table of Contents → index.md',
+};
+
 class MarkdownCLI {
   constructor() {
     this.parser = new MarkdownTreeParser();
@@ -34,7 +73,10 @@ class MarkdownCLI {
       const resolvedPath = path.resolve(filePath);
       return await fs.readFile(resolvedPath, 'utf-8');
     } catch (error) {
-      console.error(`❌ Error reading file ${filePath}:`, error.message);
+      console.error(
+        `${MESSAGES.ERROR} reading file ${filePath}:`,
+        error.message
+      );
       process.exit(1);
     }
   }
@@ -44,21 +86,39 @@ class MarkdownCLI {
       const resolvedPath = path.resolve(filePath);
       await fs.writeFile(resolvedPath, content, 'utf-8');
       console.log(
-        `✅ Written to ${path.relative(process.cwd(), resolvedPath)}`
+        `${MESSAGES.WRITE_SUCCESS} ${path.relative(process.cwd(), resolvedPath)}`
       );
     } catch (error) {
-      console.error(`❌ Error writing file ${filePath}:`, error.message);
+      console.error(
+        `${MESSAGES.ERROR} writing file ${filePath}:`,
+        error.message
+      );
       process.exit(1);
     }
   }
 
-  sanitizeFilename(text) {
+  /**
+   * Sanitize text for use in filenames or URL anchors
+   * @param {string} text - Text to sanitize
+   * @returns {string} Sanitized text
+   */
+  sanitizeText(text) {
     return text
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
+  }
+
+  // Alias for backward compatibility and semantic clarity
+  sanitizeFilename(text) {
+    return this.sanitizeText(text);
+  }
+
+  // Alias for backward compatibility and semantic clarity
+  createAnchor(text) {
+    return this.sanitizeText(text);
   }
 
   async showUsage() {
@@ -137,7 +197,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     if (!section) {
       console.error(
-        `❌ Section "${headingText}" not found in ${path.basename(filePath)}`
+        `${MESSAGES.ERROR} Section "${headingText}" not found in ${path.basename(filePath)}`
       );
 
       // Suggest similar headings
@@ -161,7 +221,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     const markdown = await this.parser.stringify(section);
 
     if (outputDir) {
-      const filename = this.sanitizeFilename(headingText) + '.md';
+      const filename = `${this.sanitizeFilename(headingText)}.md`;
       const outputPath = path.join(outputDir, filename);
       await fs.mkdir(outputDir, { recursive: true });
       await this.writeFile(outputPath, markdown);
@@ -178,7 +238,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     if (sections.length === 0) {
       console.log(
-        `⚠️  No sections found at level ${level} in ${path.basename(filePath)}`
+        `${MESSAGES.NO_SECTIONS_FOUND} at level ${level} in ${path.basename(filePath)}`
       );
       return;
     }
@@ -302,7 +362,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     if (!toc) {
       console.log(
-        `⚠️  No headings found in ${path.basename(filePath)} to generate TOC`
+        `${MESSAGES.WARNING} No headings found in ${path.basename(filePath)} to generate TOC`
       );
       return;
     }
@@ -350,108 +410,134 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     return { command, args: filteredArgs, options };
   }
 
+  // Command handlers
+  async handleVersionCommand() {
+    const version = await this.getVersion();
+    console.log(`md-tree v${version}`);
+  }
+
+  async handleHelpCommand() {
+    await this.showUsage();
+  }
+
+  async handleListCommand(args, options) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_LIST);
+      process.exit(1);
+    }
+    await this.listHeadings(args[1], options.format);
+  }
+
+  async handleExtractCommand(args, options) {
+    if (args.length < 3) {
+      console.error(MESSAGES.USAGE_EXTRACT);
+      process.exit(1);
+    }
+    await this.extractSection(args[1], args[2], options.output);
+  }
+
+  async handleExtractAllCommand(args, options) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_EXTRACT_ALL);
+      process.exit(1);
+    }
+    const level = args[2] ? parseInt(args[2]) : options.level;
+    await this.extractAllSections(args[1], level, options.output);
+  }
+
+  async handleExplodeCommand(args) {
+    if (args.length < 3) {
+      console.error(MESSAGES.USAGE_EXPLODE);
+      process.exit(1);
+    }
+    await this.explodeDocument(args[1], args[2]);
+  }
+
+  async handleAssembleCommand(args) {
+    if (args.length < 3) {
+      console.error(MESSAGES.USAGE_ASSEMBLE);
+      process.exit(1);
+    }
+    await this.assembleDocument(args[1], args[2]);
+  }
+
+  async handleTreeCommand(args) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_TREE);
+      process.exit(1);
+    }
+    await this.showTree(args[1]);
+  }
+
+  async handleSearchCommand(args, options) {
+    if (args.length < 3) {
+      console.error(MESSAGES.USAGE_SEARCH);
+      process.exit(1);
+    }
+    await this.searchNodes(args[1], args[2], options.format);
+  }
+
+  async handleStatsCommand(args) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_STATS);
+      process.exit(1);
+    }
+    await this.showStats(args[1]);
+  }
+
+  async handleTocCommand(args, options) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_TOC);
+      process.exit(1);
+    }
+    await this.generateTOC(args[1], options.maxLevel);
+  }
+
   async run() {
     const { command, args, options } = this.parseArgs();
 
     try {
       switch (command) {
-        case 'version': {
-          const version = await this.getVersion();
-          console.log(`md-tree v${version}`);
+        case 'version':
+          await this.handleVersionCommand();
           break;
-        }
-
         case 'help':
-          await this.showUsage();
+          await this.handleHelpCommand();
           break;
-
         case 'list':
-          if (args.length < 2) {
-            console.error('❌ Usage: md-tree list <file>');
-            process.exit(1);
-          }
-          await this.listHeadings(args[1], options.format);
+          await this.handleListCommand(args, options);
           break;
-
         case 'extract':
-          if (args.length < 3) {
-            console.error('❌ Usage: md-tree extract <file> <heading>');
-            process.exit(1);
-          }
-          await this.extractSection(args[1], args[2], options.output);
+          await this.handleExtractCommand(args, options);
           break;
-
-        case 'extract-all': {
-          if (args.length < 2) {
-            console.error('❌ Usage: md-tree extract-all <file> [level]');
-            process.exit(1);
-          }
-          const level = args[2] ? parseInt(args[2]) : options.level;
-          await this.extractAllSections(args[1], level, options.output);
+        case 'extract-all':
+          await this.handleExtractAllCommand(args, options);
           break;
-        }
-
-        case 'explode': {
-          if (args.length < 3) {
-            console.error(
-              '❌ Usage: md-tree explode <file> <output-directory>'
-            );
-            process.exit(1);
-          }
-          await this.explodeDocument(args[1], args[2]);
+        case 'explode':
+          await this.handleExplodeCommand(args);
           break;
-        }
-
-        case 'assemble': {
-          if (args.length < 3) {
-            console.error(
-              '❌ Usage: md-tree assemble <directory> <output-file>'
-            );
-            process.exit(1);
-          }
-          await this.assembleDocument(args[1], args[2]);
+        case 'assemble':
+          await this.handleAssembleCommand(args);
           break;
-        }
-
         case 'tree':
-          if (args.length < 2) {
-            console.error('❌ Usage: md-tree tree <file>');
-            process.exit(1);
-          }
-          await this.showTree(args[1]);
+          await this.handleTreeCommand(args);
           break;
-
         case 'search':
-          if (args.length < 3) {
-            console.error('❌ Usage: md-tree search <file> <selector>');
-            process.exit(1);
-          }
-          await this.searchNodes(args[1], args[2], options.format);
+          await this.handleSearchCommand(args, options);
           break;
-
         case 'stats':
-          if (args.length < 2) {
-            console.error('❌ Usage: md-tree stats <file>');
-            process.exit(1);
-          }
-          await this.showStats(args[1]);
+          await this.handleStatsCommand(args);
           break;
-
         case 'toc':
-          if (args.length < 2) {
-            console.error('❌ Usage: md-tree toc <file>');
-            process.exit(1);
-          }
-          await this.generateTOC(args[1], options.maxLevel);
+          await this.handleTocCommand(args, options);
           break;
-
         default:
-          console.error(`❌ Unknown command: ${command}`);
+          console.error(`${MESSAGES.ERROR} Unknown command: ${command}`);
           console.log('Run "md-tree help" for usage information.');
           process.exit(1);
       }
     } catch (error) {
-      console.error('❌ Error:', error.message);
+      console.error(`${MESSAGES.ERROR}:`, error.message);
       if (process.env.DEBUG) {
         console.error(error.stack);
       }
@@ -516,7 +602,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     if (sections.length === 0) {
       console.log(
-        `⚠️  No sections found at level 2 in ${path.basename(filePath)}`
+        `${MESSAGES.NO_SECTIONS_FOUND} at level 2 in ${path.basename(filePath)}`
       );
       return;
     }
@@ -560,7 +646,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       });
 
       await this.writeFile(outputPath, adjustedContent);
-      console.log(`✅ ${headingText} → ${filename}`);
+      console.log(
+        `${MESSAGES.PROCESSING} ${headingText} ${MESSAGES.SECTION_ARROW} ${filename}`
+      );
     }
 
     // Parse content with AST to generate rich TOC with all subsections
@@ -571,7 +659,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     );
     const indexPath = path.join(outputDir, 'index.md');
     await this.writeFile(indexPath, indexContent);
-    console.log(`✅ Table of Contents → index.md`);
+    console.log(`${MESSAGES.PROCESSING} ${MESSAGES.TOC_CREATED}`);
 
     console.log(
       `\n✨ Document exploded to ${outputDir} (${sectionFiles.length + 1} files)`
@@ -636,33 +724,43 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     return toc;
   }
 
-  // Helper to create URL-friendly anchors
-  createAnchor(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
-
-  // Method to decrement ALL heading levels in text (shift all headings down one level)
-  decrementAllHeadingLevelsInText(content) {
+  /**
+   * Adjust heading levels in markdown content
+   * @param {string} content - Markdown content
+   * @param {number} adjustment - Number of levels to adjust (+1 to increase level, -1 to decrease level)
+   * @returns {string} Content with adjusted heading levels
+   */
+  adjustHeadingLevels(content, adjustment) {
     const lines = content.split('\n');
 
     const adjustedLines = lines.map((line) => {
-      // Check if line is a heading (starts with #)
-      const headingMatch = line.match(/^(#{1,5})(\s+.*)$/);
+      const headingMatch = line.match(PATTERNS.HEADING_LEVEL_1_5);
       if (headingMatch) {
         const [, hashes, rest] = headingMatch;
-        // Add one more # to decrease the level (level 1 becomes level 2, etc.)
-        // Only do this for levels 1-5 to avoid going beyond level 6
-        return '#' + hashes + rest;
+        const currentLevel = hashes.length;
+        const newLevel = currentLevel + adjustment;
+
+        // Ensure we stay within valid heading level bounds (1-6)
+        if (
+          newLevel >= LIMITS.MIN_HEADING_LEVEL &&
+          newLevel <= LIMITS.MAX_HEADING_LEVEL
+        ) {
+          return '#'.repeat(newLevel) + rest;
+        }
       }
       return line;
     });
 
     return adjustedLines.join('\n');
+  }
+
+  // Convenience methods for backward compatibility
+  decrementAllHeadingLevelsInText(content) {
+    return this.adjustHeadingLevels(content, 1); // Add # (decrease logical level)
+  }
+
+  incrementHeadingLevelsInText(content) {
+    return this.adjustHeadingLevels(content, 1); // Add # (increase logical level)
   }
 
   // Generate index content preserving original spacing
@@ -770,7 +868,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     try {
       await fs.access(indexPath);
     } catch {
-      console.error(`❌ index.md not found in ${inputDir}`);
+      console.error(
+        `${MESSAGES.ERROR} ${MESSAGES.INDEX_NOT_FOUND} ${inputDir}`
+      );
       process.exit(1);
     }
 
@@ -782,7 +882,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     const mainTitle = headings.find((h) => h.level === 1);
 
     if (!mainTitle) {
-      console.error('❌ No main title found in index.md');
+      console.error(`${MESSAGES.ERROR} ${MESSAGES.NO_MAIN_TITLE}`);
       process.exit(1);
     }
 
@@ -792,7 +892,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     const sectionFiles = await this.extractSectionFilesFromTOC(indexTree);
 
     if (sectionFiles.length === 0) {
-      console.error('❌ No section files found in TOC');
+      console.error(`${MESSAGES.ERROR} ${MESSAGES.NO_SECTION_FILES}`);
       process.exit(1);
     }
 
@@ -803,7 +903,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     // Process each section file
     for (const sectionFile of sectionFiles) {
-      console.log(`✅ Processing ${sectionFile.filename}...`);
+      console.log(`${MESSAGES.PROCESSING} ${sectionFile.filename}...`);
 
       const filePath = path.join(inputDir, sectionFile.filename);
       try {
@@ -816,10 +916,10 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
         // Add the section content:
         // - After main title: blank line then content (original has blank line after title)
         // - Between sections: direct concatenation (original has no spacing between sections)
-        assembledContent += '\n' + adjustedContent;
+        assembledContent += `\n${adjustedContent}`;
       } catch {
         console.error(
-          `⚠️  Warning: Could not read ${sectionFile.filename}, skipping...`
+          `${MESSAGES.WARNING}: Could not read ${sectionFile.filename}, skipping...`
         );
       }
     }
@@ -828,23 +928,6 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     await this.writeFile(outputFile, assembledContent);
     console.log(`\n✨ Document assembled to ${outputFile}`);
   } // Method to increment ALL heading levels directly in text (shift all headings up one level)
-  incrementHeadingLevelsInText(content) {
-    const lines = content.split('\n');
-
-    const adjustedLines = lines.map((line) => {
-      // Check if line is a heading (starts with #)
-      const headingMatch = line.match(/^(#{1,5})(\s+.*)$/);
-      if (headingMatch) {
-        const [, hashes, rest] = headingMatch;
-        // Add one more # to increment the level (level 1 becomes level 2, etc.)
-        // Only do this for levels 1-5 to avoid going beyond level 6
-        return '#' + hashes + rest;
-      }
-      return line;
-    });
-
-    return adjustedLines.join('\n');
-  }
 
   async extractSectionFilesFromTOC(indexTree) {
     // Convert the tree back to markdown to parse the TOC links
