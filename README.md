@@ -6,6 +6,11 @@
 
 A powerful JavaScript library and CLI tool for parsing and manipulating markdown files as tree structures. Built on top of the battle-tested [remark/unified](https://github.com/remarkjs/remark) ecosystem.
 
+<div align="center">
+<!-- <img src="https://github.com/ksylvan/markdown-tree-parser/blob/main/logo.png?raw=true" alt="md-tree logo" width="200" height="200"> -->
+<img src="./logo.png" alt="md-tree logo" width="200" height="200">
+</div>
+
 ## 🚀 Features
 
 - **🌳 Tree-based parsing** - Treats markdown as manipulable Abstract Syntax Trees (AST)
