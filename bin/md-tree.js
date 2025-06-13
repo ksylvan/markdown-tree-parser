@@ -7,9 +7,9 @@
  */
 
 import { MarkdownTreeParser } from '../lib/markdown-parser.js';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(__dirname, '..', 'package.json');
@@ -22,6 +22,7 @@ const PATTERNS = {
   LEVEL_2_HEADING: /^## /,
   TOC_LINK: /\[([^\]]+)\]\(\.\/([^#)]+)(?:#[^)]*)?\)/,
   LEVEL_2_TOC_ITEM: /^ {2}[-*] \[/,
+  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
 };
 
 const LIMITS = {
@@ -46,6 +47,7 @@ const MESSAGES = {
   USAGE_SEARCH: '❌ Usage: md-tree search <file> <selector>',
   USAGE_STATS: '❌ Usage: md-tree stats <file>',
   USAGE_TOC: '❌ Usage: md-tree toc <file>',
+  USAGE_CHECK_LINKS: '❌ Usage: md-tree check-links <file>',
   INDEX_NOT_FOUND: 'index.md not found in',
   NO_MAIN_TITLE: 'No main title found in index.md',
   NO_SECTION_FILES: 'No section files found in TOC',
@@ -138,6 +140,7 @@ Commands:
   search <file> <selector>      Search using CSS-like selectors
   stats <file>                  Show document statistics
   toc <file>                    Generate table of contents
+  check-links <file>            Verify that links are reachable
   version                       Show version information
   help                          Show this help message
 
@@ -146,6 +149,7 @@ Options:
   --level, -l <number>          Heading level to work with
   --format, -f <json|text>      Output format (default: text)
   --max-level <number>          Maximum heading level for TOC (default: 3)
+  --recursive, -r               Recursively check linked markdown files
 
 Examples:
   md-tree list README.md
@@ -212,7 +216,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
       if (suggestions.length > 0) {
         console.log('\n💡 Did you mean one of these?');
-        suggestions.forEach((h) => console.log(`   - "${h.text}"`));
+        for (const h of suggestions) {
+          console.log(`   - "${h.text}"`);
+        }
       }
 
       process.exit(1);
@@ -286,12 +292,12 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     console.log(`\n🌳 Document structure for ${path.basename(filePath)}:\n`);
 
-    headings.forEach((heading) => {
+    for (const heading of headings) {
       const indent = '  '.repeat(heading.level - 1);
       const icon =
         heading.level === 1 ? '📁' : heading.level === 2 ? '📄' : '📃';
       console.log(`${indent}${icon} ${heading.text}`);
-    });
+    }
   }
 
   async searchNodes(filePath, selector, format = 'text') {
@@ -342,11 +348,11 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     if (Object.keys(stats.headings.byLevel).length > 0) {
       console.log('   By level:');
-      Object.entries(stats.headings.byLevel)
-        .sort(([a], [b]) => parseInt(a) - parseInt(b))
-        .forEach(([level, count]) => {
-          console.log(`     Level ${level}: ${count}`);
-        });
+      for (const [level, count] of Object.entries(stats.headings.byLevel).sort(
+        ([a], [b]) => Number.parseInt(a) - Number.parseInt(b)
+      )) {
+        console.log(`     Level ${level}: ${count}`);
+      }
     }
 
     console.log(`💻 Code blocks: ${stats.codeBlocks}`);
@@ -371,6 +377,60 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     console.log(toc);
   }
 
+  async checkLinks(filePath, recursive = false, visited = new Set()) {
+    const resolvedPath = path.resolve(filePath);
+    if (visited.has(resolvedPath)) return;
+    visited.add(resolvedPath);
+
+    const content = await this.readFile(resolvedPath);
+    const tree = await this.parser.parse(content);
+    const links = this.parser.selectAll(tree, 'link');
+
+    console.log(
+      `\n🔗 Checking ${links.length} links in ${path.basename(resolvedPath)}:`
+    );
+
+    for (const link of links) {
+      const url = link.url;
+      if (!url || url.startsWith('#')) {
+        continue;
+      }
+
+      // Show email links but mark as skipped
+      if (url.startsWith('mailto:') || PATTERNS.EMAIL.test(url)) {
+        console.log(`⏭️  ${url} (email - skipped)`);
+        continue;
+      }
+
+      if (/^https?:\/\//i.test(url)) {
+        try {
+          const res = await globalThis.fetch(url, { method: 'HEAD' });
+          if (res.ok) {
+            console.log(`✅ ${url}`);
+          } else {
+            console.log(`❌ ${url} (${res.status})`);
+          }
+        } catch (err) {
+          console.log(`❌ ${url} (${err.message})`);
+        }
+      } else {
+        const target = path.resolve(
+          path.dirname(resolvedPath),
+          url.split('#')[0]
+        );
+        try {
+          await fs.access(target);
+          console.log(`✅ ${url}`);
+          if (recursive && /\.md$/i.test(target)) {
+            await this.checkLinks(target, true, visited);
+          }
+        } catch {
+          console.log(`❌ ${url} (file not found)`);
+        }
+      }
+    }
+  }
+
   parseArgs() {
     const args = process.argv.slice(2);
 
@@ -384,6 +444,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       level: 2,
       format: 'text',
       maxLevel: 3,
+      recursive: false,
     };
 
     // Parse flags
@@ -394,14 +455,16 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
         options.output = args[i + 1];
         i++; // skip next arg
       } else if (arg === '--level' || arg === '-l') {
-        options.level = parseInt(args[i + 1]) || 2;
+        options.level = Number.parseInt(args[i + 1]) || 2;
         i++; // skip next arg
       } else if (arg === '--format' || arg === '-f') {
         options.format = args[i + 1] || 'text';
         i++; // skip next arg
       } else if (arg === '--max-level') {
-        options.maxLevel = parseInt(args[i + 1]) || 3;
+        options.maxLevel = Number.parseInt(args[i + 1]) || 3;
         i++; // skip next arg
+      } else if (arg === '--recursive' || arg === '-r') {
+        options.recursive = true;
       } else if (!arg.startsWith('-')) {
         filteredArgs.push(arg);
       }
@@ -441,7 +504,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       console.error(MESSAGES.USAGE_EXTRACT_ALL);
       process.exit(1);
     }
-    const level = args[2] ? parseInt(args[2]) : options.level;
+    const level = args[2] ? Number.parseInt(args[2]) : options.level;
     await this.extractAllSections(args[1], level, options.output);
   }
 
@@ -493,6 +556,14 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     await this.generateTOC(args[1], options.maxLevel);
   }
 
+  async handleCheckLinksCommand(args, options) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_CHECK_LINKS);
+      process.exit(1);
+    }
+    await this.checkLinks(args[1], options.recursive);
+  }
+
   async run() {
     const { command, args, options } = this.parseArgs();
 
@@ -530,6 +601,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
           break;
         case 'toc':
           await this.handleTocCommand(args, options);
+          break;
+        case 'check-links':
+          await this.handleCheckLinksCommand(args, options);
           break;
         default:
           console.error(`${MESSAGES.ERROR} Unknown command: ${command}`);
@@ -685,9 +759,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     // Create a map of section names to filenames for quick lookup
     const sectionMap = new Map();
-    sectionFiles.forEach((file) => {
+    for (const file of sectionFiles) {
       sectionMap.set(file.headingText.toLowerCase(), file.filename);
-    });
+    }
 
     // Start with title and TOC heading
     let toc = `# ${mainTitle.text}\n\n## Table of Contents\n\n`;
@@ -778,9 +852,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 
     // Create a map of section names to filenames for quick lookup
     const sectionMap = new Map();
-    sectionFiles.forEach((file) => {
+    for (const file of sectionFiles) {
       sectionMap.set(file.headingText.toLowerCase(), file.filename);
-    });
+    }
 
     // Start with title and TOC heading, preserving original spacing
     let toc = `# ${mainTitle}\n\n## Table of Contents\n\n`;
@@ -789,9 +863,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     toc += `- [${mainTitle}](#table-of-contents)\n`;
 
     // Add links for each section
-    sectionFiles.forEach((file) => {
+    for (const file of sectionFiles) {
       toc += `  - [${file.headingText}](./${file.filename})\n`;
-    });
+    }
 
     return toc;
   }

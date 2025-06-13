@@ -499,6 +499,91 @@ Final section content.
     );
   });
 
+  // Test email pattern matching (used by check-links)
+  await test('Email pattern validation', async () => {
+    // Test the email regex pattern directly (recreated from md-tree.js)
+    const EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    // Valid email patterns
+    assert(EMAIL_PATTERN.test('user@example.com'), 'Should match simple email');
+    assert(EMAIL_PATTERN.test('kayvan@sylvan.com'), 'Should match real email');
+    assert(
+      EMAIL_PATTERN.test('test.user+tag@domain.co.uk'),
+      'Should match complex email'
+    );
+    assert(
+      EMAIL_PATTERN.test('user123@test-domain.org'),
+      'Should match email with numbers and hyphens'
+    );
+
+    // Invalid patterns that should NOT match
+    assert(!EMAIL_PATTERN.test('not-an-email'), 'Should not match plain text');
+    assert(
+      !EMAIL_PATTERN.test('@domain.com'),
+      'Should not match email without user'
+    );
+    assert(
+      !EMAIL_PATTERN.test('user@'),
+      'Should not match email without domain'
+    );
+    assert(
+      !EMAIL_PATTERN.test('mailto:user@domain.com'),
+      'Should not match mailto URLs (handled separately)'
+    );
+    assert(
+      !EMAIL_PATTERN.test('https://example.com'),
+      'Should not match HTTPS URLs'
+    );
+  });
+
+  // Test link extraction and filtering
+  await test('Link extraction for check-links functionality', async () => {
+    const linkTestMarkdown = `# Links Test
+
+Various link types:
+
+- [Email link](user@example.com)
+- [Mailto link](mailto:support@example.com)
+- [HTTPS link](https://github.com)
+- [HTTP link](http://example.com)
+- [Local file](./docs/readme.md)
+- [Hash link](#section)
+- [Complex local](../parent/file.md#section)
+
+Plain text with email@domain.com should not be a link.
+`;
+
+    const tree = await parser.parse(linkTestMarkdown);
+    const links = parser.selectAll(tree, 'link');
+
+    assert(
+      links.length === 7,
+      `Should find 7 link elements, found ${links.length}`
+    );
+
+    // Check specific link URLs
+    const linkUrls = links.map((link) => link.url);
+    assert(
+      linkUrls.includes('user@example.com'),
+      'Should find bare email link'
+    );
+    assert(
+      linkUrls.includes('mailto:support@example.com'),
+      'Should find mailto link'
+    );
+    assert(linkUrls.includes('https://github.com'), 'Should find HTTPS link');
+    assert(linkUrls.includes('http://example.com'), 'Should find HTTP link');
+    assert(
+      linkUrls.includes('./docs/readme.md'),
+      'Should find local file link'
+    );
+    assert(linkUrls.includes('#section'), 'Should find hash link');
+    assert(
+      linkUrls.includes('../parent/file.md#section'),
+      'Should find complex local link'
+    );
+  });
+
   // Summary
   console.log(`\n📊 Test Results: ${passedTests}/${testCount} passed`);
 

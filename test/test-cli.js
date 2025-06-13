@@ -307,6 +307,145 @@ async function runTests() {
     );
   });
 
+  // Test check-links command
+  await test('CLI check-links command with mixed link types', async () => {
+    // Create a test file with various link types
+    const testLinksFile = path.join(testDir, 'test-links.md');
+    const testLinksContent = `# Test Links Document
+
+## Contact Information
+
+- Email: [kayvan@sylvan.com](kayvan@sylvan.com)
+- Support: [mailto:support@example.com](mailto:support@example.com)
+- Website: [https://github.com](https://github.com)
+- Local doc: [./sample.md](./sample.md)
+- Hash link: [Table of Contents](#table-of-contents)
+- Broken link: [broken.md](./broken.md)
+
+## Table of Contents
+
+Content here.
+`;
+
+    await fs.writeFile(testLinksFile, testLinksContent, 'utf-8');
+
+    // Also create the referenced sample.md file so it passes
+    const sampleFile = path.join(testDir, 'sample.md');
+    await fs.writeFile(sampleFile, '# Sample\n\nContent', 'utf-8');
+
+    const result = await runCLI(['check-links', testLinksFile]);
+
+    assert(result.code === 0, 'Check-links command should succeed');
+
+    // Should show checking message
+    assert(
+      result.stdout.includes('🔗 Checking'),
+      'Should show checking message'
+    );
+
+    // Should check HTTPS link
+    assert(
+      result.stdout.includes('✅ https://github.com') ||
+        result.stdout.includes('❌ https://github.com'),
+      'Should attempt to check HTTPS link'
+    );
+
+    // Should check local file and find it
+    assert(
+      result.stdout.includes('✅ ./sample.md'),
+      'Should find existing local file'
+    );
+
+    // Should find broken local file
+    assert(
+      result.stdout.includes('❌ ./broken.md (file not found)'),
+      'Should report broken local file'
+    );
+
+    // Should show email links as skipped
+    assert(
+      result.stdout.includes('⏭️  kayvan@sylvan.com (email - skipped)'),
+      'Should show bare email links as skipped'
+    );
+    assert(
+      result.stdout.includes(
+        '⏭️  mailto:support@example.com (email - skipped)'
+      ),
+      'Should show mailto links as skipped'
+    );
+
+    // Should NOT show hash links (they should be ignored)
+    assert(
+      !result.stdout.includes('#table-of-contents'),
+      'Should ignore hash links'
+    );
+  });
+
+  await test('CLI check-links with missing file', async () => {
+    const result = await runCLI(['check-links', 'non-existent.md']);
+    assert(result.code !== 0, 'Should fail with non-existent file');
+    assert(
+      result.stderr.includes('Error reading file') ||
+        result.stderr.includes('ENOENT') ||
+        result.stderr.includes('File not found'),
+      'Should show file not found error'
+    );
+  });
+
+  await test('CLI check-links usage help', async () => {
+    const result = await runCLI(['check-links']);
+    assert(result.code !== 0, 'Should fail with missing arguments');
+    assert(
+      result.stderr.includes('Usage: md-tree check-links'),
+      'Should show usage message'
+    );
+  });
+
+  await test('CLI check-links recursive option', async () => {
+    // Create main file with link to another markdown file
+    const mainFile = path.join(testDir, 'main.md');
+    const linkedFile = path.join(testDir, 'linked.md');
+
+    const mainContent = `# Main Document
+
+See also: [Linked Document](./linked.md)
+`;
+
+    const linkedContent = `# Linked Document
+
+This document has links too:
+- [External](https://example.com)
+- [Back to main](./main.md)
+`;
+
+    await fs.writeFile(mainFile, mainContent, 'utf-8');
+    await fs.writeFile(linkedFile, linkedContent, 'utf-8');
+
+    const result = await runCLI(['check-links', mainFile, '--recursive']);
+
+    assert(result.code === 0, 'Recursive check-links should succeed');
+    assert(
+      result.stdout.includes('✅ ./linked.md'),
+      'Should check link to other markdown file'
+    );
+    // Should also check links in the linked file due to recursive flag
+    assert(
+      result.stdout.includes('linked.md') &&
+        (result.stdout.includes('example.com') ||
+          result.stdout.includes('https://example.com')),
+      'Should recursively check links in linked markdown files'
+    );
+  });
+
+  await test('CLI help includes check-links', async () => {
+    const result = await runCLI(['help']);
+    assert(result.code === 0, 'Help command should succeed');
+    assert(
+      result.stdout.includes('check-links'),
+      'Help should mention check-links'
+    );
+  });
+
   await cleanupTests();
 
   // Summary

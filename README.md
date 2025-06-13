@@ -96,6 +96,13 @@ md-tree search README.md "link"
 md-tree stats README.md
 ```
 
+### Check links
+
+```bash
+md-tree check-links README.md
+md-tree check-links README.md --recursive
+```
+
 ### Generate table of contents
 
 ```bash
