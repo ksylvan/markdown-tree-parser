@@ -75,3 +75,15 @@ export async function generateTOC(markdown, maxLevel = 3, options = {}) {
   const tree = await parser.parse(markdown);
   return parser.generateTableOfContents(tree, maxLevel);
 }
+
+/**
+ * Quick utility to check links in markdown
+ * @param {string} markdown - Markdown content
+ * @param {Object} options - Parser options
+ * @returns {Promise<Array>} Array of link check results
+ */
+export async function checkLinks(markdown, options = {}) {
+  const parser = new MarkdownTreeParser(options);
+  const tree = await parser.parse(markdown);
+  return parser.checkLinks(tree, options);
+}

@@ -46,6 +46,7 @@ const MESSAGES = {
   USAGE_SEARCH: '❌ Usage: md-tree search <file> <selector>',
   USAGE_STATS: '❌ Usage: md-tree stats <file>',
   USAGE_TOC: '❌ Usage: md-tree toc <file>',
+  USAGE_CHECK_LINKS: '❌ Usage: md-tree check-links <file>',
   INDEX_NOT_FOUND: 'index.md not found in',
   NO_MAIN_TITLE: 'No main title found in index.md',
   NO_SECTION_FILES: 'No section files found in TOC',
@@ -138,6 +139,7 @@ Commands:
   search <file> <selector>      Search using CSS-like selectors
   stats <file>                  Show document statistics
   toc <file>                    Generate table of contents
+  check-links <file>            Verify that links are reachable
   version                       Show version information
   help                          Show this help message
 
@@ -146,6 +148,7 @@ Options:
   --level, -l <number>          Heading level to work with
   --format, -f <json|text>      Output format (default: text)
   --max-level <number>          Maximum heading level for TOC (default: 3)
+  --recursive, -r               Recursively check linked markdown files
 
 Examples:
   md-tree list README.md
@@ -157,6 +160,7 @@ Examples:
   md-tree search README.md "heading[depth=2]"
   md-tree stats README.md
   md-tree toc README.md --max-level 2
+  md-tree check-links README.md --recursive
 
 For more information, visit: https://github.com/ksylvan/markdown-tree-parser
 `);
@@ -355,6 +359,34 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     console.log(`🖼️  Images: ${stats.images}`);
   }
 
+  async checkLinks(filePath, recursive = false) {
+    const content = await this.readFile(filePath);
+    const tree = await this.parser.parse(content);
+    const results = await this.parser.checkLinks(tree, {
+      baseDir: path.dirname(path.resolve(filePath)),
+      recursive,
+    });
+
+    console.log(`\n🔗 Checking links in ${path.basename(filePath)}:\n`);
+
+    const bad = [];
+    results.forEach((r) => {
+      if (r.ok) {
+        console.log(`✅ ${r.url}`);
+      } else {
+        console.log(`❌ ${r.url} - ${r.error || r.status}`);
+        bad.push(r);
+      }
+    });
+
+    if (bad.length > 0) {
+      console.log(`\n${MESSAGES.WARNING} ${bad.length} broken link(s) found.`);
+      process.exitCode = 1;
+    } else {
+      console.log('\nAll links look good!');
+    }
+  }
+
   async generateTOC(filePath, maxLevel = 3) {
     const content = await this.readFile(filePath);
     const tree = await this.parser.parse(content);
@@ -384,6 +416,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       level: 2,
       format: 'text',
       maxLevel: 3,
+      recursive: false,
     };
 
     // Parse flags
@@ -402,6 +435,8 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       } else if (arg === '--max-level') {
         options.maxLevel = parseInt(args[i + 1]) || 3;
         i++; // skip next arg
+      } else if (arg === '--recursive' || arg === '-r') {
+        options.recursive = true;
       } else if (!arg.startsWith('-')) {
         filteredArgs.push(arg);
       }
@@ -493,6 +528,14 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     await this.generateTOC(args[1], options.maxLevel);
   }
 
+  async handleCheckLinksCommand(args, options) {
+    if (args.length < 2) {
+      console.error(MESSAGES.USAGE_CHECK_LINKS);
+      process.exit(1);
+    }
+    await this.checkLinks(args[1], options.recursive);
+  }
+
   async run() {
     const { command, args, options } = this.parseArgs();
 
@@ -530,6 +573,9 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
           break;
         case 'toc':
           await this.handleTocCommand(args, options);
+          break;
+        case 'check-links':
+          await this.handleCheckLinksCommand(args, options);
           break;
         default:
           console.error(`${MESSAGES.ERROR} Unknown command: ${command}`);
