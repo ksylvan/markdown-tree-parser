@@ -385,13 +385,23 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     const content = await this.readFile(resolvedPath);
     const tree = await this.parser.parse(content);
     const links = this.parser.selectAll(tree, 'link');
+    const definitions = this.parser.selectAll(tree, 'definition');
+
+    const allUrls = [];
+    for (const link of links) {
+      allUrls.push(link.url);
+    }
+    for (const definition of definitions) {
+      allUrls.push(definition.url);
+    }
+
+    const uniqueUrls = new Set(allUrls);
 
     console.log(
-      `\n🔗 Checking ${links.length} links in ${path.basename(resolvedPath)}:`
+      `\n🔗 Checking ${uniqueUrls.size} unique URLs in ${path.basename(resolvedPath)}:`
     );
 
-    for (const link of links) {
-      const url = link.url;
+    for (const url of uniqueUrls) {
       if (!url || url.startsWith('#')) {
         continue;
       }
