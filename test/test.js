@@ -5,9 +5,9 @@
  */
 
 import { MarkdownTreeParser, createParser, extractSection } from '../index.js';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -67,10 +67,9 @@ function test(name, fn) {
         .catch((error) => {
           console.error(`❌ ${name}: ${error.message}`);
         });
-    } else {
-      passedTests++;
-      console.log(`✅ ${name}`);
     }
+    passedTests++;
+    console.log(`✅ ${name}`);
   } catch (error) {
     console.error(`❌ ${name}: ${error.message}`);
   }
