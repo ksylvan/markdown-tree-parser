@@ -5,6 +5,7 @@
  */
 
 import { MarkdownTreeParser, createParser, extractSection } from '../index.js';
+import { MarkdownCLI } from '../bin/md-tree.js'; // Added for checkLinks test
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -581,6 +582,101 @@ Plain text with email@domain.com should not be a link.
       linkUrls.includes('../parent/file.md#section'),
       'Should find complex local link'
     );
+  });
+
+  // Test suite for checkLinks
+  await test('Check Links Functionality', async () => {
+    const cli = new MarkdownCLI();
+    const testReferenceLinksFile = path.join(
+      __dirname,
+      'test-reference-links.md'
+    );
+    const testDummySampleFilePath = path.join(
+      __dirname,
+      'test-dummy-sample.md'
+    );
+
+    // Create a unique dummy file for local link checking to pass
+    await fs.writeFile(
+      testDummySampleFilePath,
+      '# Test Dummy Sample File\n\nThis is a test dummy file for testing links.'
+    );
+
+    await test('Check reference-style links', async () => {
+      const markdownContent = await fs.readFile(
+        testReferenceLinksFile,
+        'utf-8'
+      );
+      const tree = await cli.parser.parse(markdownContent);
+      const links = cli.parser.selectAll(tree, 'link');
+      const definitions = cli.parser.selectAll(tree, 'definition');
+
+      const collectedUrls = new Set();
+      for (const link of links) {
+        if (link.url) collectedUrls.add(link.url);
+      }
+      for (const def of definitions) {
+        if (def.url) collectedUrls.add(def.url);
+      }
+
+      assert(
+        collectedUrls.has('https://www.google.com'),
+        'Should find Google link from definition'
+      );
+      assert(
+        collectedUrls.has('./test-dummy-sample.md'),
+        'Should find local-doc link from definition'
+      );
+      assert(
+        !collectedUrls.has('[undefined]'),
+        'Should not treat undefined reference as a URL'
+      );
+      // The following assertions were removed because selectAll(tree, 'link') for reference-style links
+      // correctly returns linkReference nodes which do not have the 'url' property populated directly.
+      // The url is resolved by checkLinks by looking at 'definition' nodes,
+      // which is already tested by the collectedUrls assertions and the checkLinks output assertions.
+      // assert(links.some(link => link.reference === 'google' && link.url === 'https://www.google.com'), 'Link object for google should have url');
+      // assert(links.some(link => link.reference === 'local-doc' && link.url === './sample.md'), 'Link object for local-doc should have url');
+
+      // Test the checkLinks output
+      const originalConsoleLog = console.log;
+      const logs = [];
+      console.log = (...args) => {
+        logs.push(args.join(' '));
+      };
+
+      try {
+        await cli.checkLinks(testReferenceLinksFile);
+      } finally {
+        console.log = originalConsoleLog;
+        // Clean up test dummy file
+        try {
+          await fs.unlink(testDummySampleFilePath);
+        } catch (error) {
+          // Ignore cleanup errors - file might not exist
+          console.warn(
+            `Warning: Could not clean up ${testDummySampleFilePath}:`,
+            error.message
+          );
+        }
+      }
+
+      const output = logs.join('\n');
+      assert(
+        output.includes('🔗 Checking 2 unique URLs'),
+        'Should check 2 unique URLs'
+      );
+      assert(
+        output.includes('✅ https://www.google.com'),
+        'Should successfully check Google link'
+      );
+      // Note: The actual local file path in output might be resolved.
+      // We check for the original URL './test-dummy-sample.md' and the "✅" status.
+      assert(
+        output.includes('✅ ./test-dummy-sample.md'),
+        'Should successfully check local test dummy sample file link'
+      );
+    });
   });
 
   // Summary
