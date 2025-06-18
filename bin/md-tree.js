@@ -107,7 +107,10 @@ class MarkdownCLI {
   sanitizeText(text) {
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(
+        /[^a-z0-9\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\s-]/g,
+        ''
+      )
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');

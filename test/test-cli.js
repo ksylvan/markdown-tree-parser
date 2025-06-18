@@ -445,6 +445,42 @@ This document has links too:
     );
   });
 
+  await test('CLI explode command with CJK characters', async () => {
+    const cjkTestFile = path.resolve(__dirname, 'test-cjk.md');
+    const outputDir = path.join(testDir, 'cjk-exploded');
+    const result = await runCLI(['explode', cjkTestFile, outputDir]);
+
+    assert(
+      result.code === 0,
+      `Command should succeed, got exit code ${result.code}\nstderr: ${result.stderr}`
+    );
+
+    const files = await fs.readdir(outputDir);
+    assert(files.includes('index.md'), 'Should create index.md');
+    assert(files.includes('章节一.md'), 'Should create file with Chinese slug');
+    assert(files.includes('章二.md'), 'Should create file with Chinese slug');
+    assert(
+      files.includes('another-section.md'),
+      'Should create file with English slug'
+    );
+
+    // Check the index file for correct links
+    const indexPath = path.join(outputDir, 'index.md');
+    const indexContent = await fs.readFile(indexPath, 'utf-8');
+    assert(
+      indexContent.includes('[章节一](./章节一.md)'),
+      'Should link to Chinese filename'
+    );
+    assert(
+      indexContent.includes('[章二](./章二.md)'),
+      'Should link to Chinese filename'
+    );
+    assert(
+      indexContent.includes('[セクション 2.1](./章二.md#セクション-21)'),
+      'Should link to Japanese subsection'
+    );
+  });
+
   await cleanupTests();
 
   // Summary
