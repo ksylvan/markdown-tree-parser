@@ -138,3 +138,7 @@ dist
 # tmp directory
 .tmp/
 tmp/
+
+# ignore CLAUDE.md file that is used by Claude Code AI to store
+# its analysis of the codebase
+CLAUDE.md
