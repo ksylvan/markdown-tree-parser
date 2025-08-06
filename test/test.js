@@ -679,6 +679,179 @@ Plain text with email@domain.com should not be a link.
     });
   });
 
+  // Test for GitHub issue #7: Parser truncates sections at # comments within embedded bash code blocks
+  await test('Handle # comments inside code blocks (GitHub issue #7)', async () => {
+    const problemMarkdown = `# Level 1 Section Header
+
+This is the introduction.
+
+## Level 2 Section Header Number 1
+
+Content for section 1.
+
+## Level 2 Section Header Number 2  
+
+Content for section 2.
+
+## Level 2 Section Header Number 3
+
+blah blah blah
+
+#### Level 4 Section Header Number 1
+
+Here is some bash code with comments:
+
+\`\`\`bash
+#!/bin/bash
+# This is a comment that should NOT be treated as a markdown header
+echo "Hello World"
+# Another comment that should stay in the code block
+cd /some/path
+\`\`\`
+
+This content should still be part of Level 2 Section Header Number 3.
+It should NOT be truncated at the # comment in the bash code above.
+
+More content here that proves the section continues.
+`;
+
+    const tree = await parser.parse(problemMarkdown);
+    const sections = parser.extractAllSections(tree, 2);
+
+    // Should find 3 level-2 sections
+    assert(
+      sections.length === 3,
+      `Should find 3 level-2 sections, found ${sections.length}`
+    );
+
+    // Find the problematic section (Level 2 Section Header Number 3)
+    const section3 = sections.find(
+      (s) => s.headingText === 'Level 2 Section Header Number 3'
+    );
+    assert(section3 !== null, 'Should find Level 2 Section Header Number 3');
+
+    // Convert the section back to markdown to examine content
+    const section3Markdown = await parser.stringify(section3.tree);
+
+    // The key test: the section should contain ALL content, including text after the code block
+    assert(
+      section3Markdown.includes(
+        'This content should still be part of Level 2 Section Header Number 3'
+      ),
+      'Section should include content after the code block with # comments'
+    );
+    assert(
+      section3Markdown.includes('It should NOT be truncated at the # comment'),
+      'Section should include the explanatory text about not being truncated'
+    );
+    assert(
+      section3Markdown.includes(
+        'More content here that proves the section continues'
+      ),
+      'Section should include the final content that proves continuation'
+    );
+    assert(
+      section3Markdown.includes(
+        '# This is a comment that should NOT be treated'
+      ),
+      'Section should include the bash code block with # comments'
+    );
+
+    // Additional verification: the section should contain the Level 4 heading
+    assert(
+      section3Markdown.includes('#### Level 4 Section Header Number 1'),
+      'Section should include the Level 4 subsection'
+    );
+  });
+
+  // Test for GitHub issue #7: CLI explode command fix - should now work correctly
+  await test('CLI explode with # comments in code blocks (GitHub issue #7 - now fixed)', async () => {
+    const { MarkdownCLI } = await import('../bin/md-tree.js');
+    const cli = new MarkdownCLI();
+
+    const problemMarkdown = `# Test Document with Code Block
+
+This is a test document that previously had a CLI explode bug.
+
+## Level 2 Section Header Number 1
+
+Content for section 1.
+
+## Level 2 Section Header Number 2  
+
+Content for section 2.
+
+## Level 2 Section Header Number 3
+
+blah blah blah
+
+#### Level 4 Section Header Number 1
+
+Here is some bash code with comments:
+
+\`\`\`bash
+#!/bin/bash
+# This comment should NOT end the section
+echo "Hello World"
+# Another comment that should stay in the code block
+cd /some/path
+\`\`\`
+
+This content should still be part of Level 2 Section Header Number 3.
+It should NOT be truncated at the # comment in the bash code above.
+
+More content here that proves the section continues.
+`;
+
+    const testFile = path.join(__dirname, 'test-cli-fixed.md');
+    const testDir = path.join(__dirname, 'test-cli-fixed-output');
+
+    try {
+      // Write test document
+      await fs.writeFile(testFile, problemMarkdown);
+
+      // Test CLI explode functionality - should now work correctly
+      await cli.explodeDocument(testFile, testDir);
+
+      // Read the section file that was previously truncated
+      const section3File = path.join(
+        testDir,
+        'level-2-section-header-number-3.md'
+      );
+      const section3Content = await fs.readFile(section3File, 'utf-8');
+
+      // After the fix, these should all pass
+      assert(
+        section3Content.includes(
+          'This content should still be part of Level 2 Section Header Number 3'
+        ),
+        'CLI explode should preserve content after code block with # comments'
+      );
+      assert(
+        section3Content.includes('It should NOT be truncated at the # comment'),
+        'CLI explode should preserve the explanatory text after code blocks'
+      );
+      assert(
+        section3Content.includes(
+          'More content here that proves the section continues'
+        ),
+        'CLI explode should preserve final content after code blocks'
+      );
+      assert(
+        section3Content.includes('# This comment should NOT end the section'),
+        'CLI explode should preserve bash code block with # comments'
+      );
+    } finally {
+      // Cleanup test files
+      try {
+        await fs.unlink(testFile);
+        await fs.rm(testDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  });
+
   // Summary
   console.log(`\n📊 Test Results: ${passedTests}/${testCount} passed`);
 

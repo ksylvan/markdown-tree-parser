@@ -646,33 +646,44 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     const sections = [];
     let currentSection = null;
 
+    // Track whether we're inside a code block to avoid treating # comments as headers
+    let inCodeBlock = false;
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Check for main title (level 1)
-      if (line.match(/^# /)) {
-        if (currentSection) {
-          currentSection.endLine = i - 1;
-          sections.push(currentSection);
-        }
-        currentSection = null;
-        continue;
+      // Track code block boundaries (``` at start of line)
+      if (line.trim().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
       }
 
-      // Check for level 2 heading (section start)
-      if (line.match(/^## /)) {
-        if (currentSection) {
-          currentSection.endLine = i - 1;
-          sections.push(currentSection);
+      // Skip header detection when inside code blocks (fixes GitHub issue #7)
+      if (!inCodeBlock) {
+        // Check for main title (level 1)
+        if (line.match(/^# /)) {
+          if (currentSection) {
+            currentSection.endLine = i - 1;
+            sections.push(currentSection);
+          }
+          currentSection = null;
+          continue;
         }
 
-        currentSection = {
-          headingText: line.replace(/^## /, ''),
-          startLine: i,
-          endLine: null,
-          lines: [],
-        };
-        continue;
+        // Check for level 2 heading (section start)
+        if (line.match(/^## /)) {
+          if (currentSection) {
+            currentSection.endLine = i - 1;
+            sections.push(currentSection);
+          }
+
+          currentSection = {
+            headingText: line.replace(/^## /, ''),
+            startLine: i,
+            endLine: null,
+            lines: [],
+          };
+          continue;
+        }
       }
 
       // Add line to current section if we're in one
