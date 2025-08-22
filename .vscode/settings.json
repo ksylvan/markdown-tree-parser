@@ -32,5 +32,6 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "files.trimTrailingWhitespace": false
-  }
+  },
+  "biome.enabled": false
 }

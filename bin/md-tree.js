@@ -6,10 +6,10 @@
  * A powerful CLI tool for parsing and manipulating markdown files as tree structures.
  */
 
-import { MarkdownTreeParser } from '../lib/markdown-parser.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MarkdownTreeParser } from '../lib/markdown-parser.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(__dirname, '..', 'package.json');
@@ -352,7 +352,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     if (Object.keys(stats.headings.byLevel).length > 0) {
       console.log('   By level:');
       for (const [level, count] of Object.entries(stats.headings.byLevel).sort(
-        ([a], [b]) => Number.parseInt(a) - Number.parseInt(b)
+        ([a], [b]) => Number.parseInt(a, 10) - Number.parseInt(b, 10)
       )) {
         console.log(`     Level ${level}: ${count}`);
       }
@@ -468,13 +468,13 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
         options.output = args[i + 1];
         i++; // skip next arg
       } else if (arg === '--level' || arg === '-l') {
-        options.level = Number.parseInt(args[i + 1]) || 2;
+        options.level = Number.parseInt(args[i + 1], 10) || 2;
         i++; // skip next arg
       } else if (arg === '--format' || arg === '-f') {
         options.format = args[i + 1] || 'text';
         i++; // skip next arg
       } else if (arg === '--max-level') {
-        options.maxLevel = Number.parseInt(args[i + 1]) || 3;
+        options.maxLevel = Number.parseInt(args[i + 1], 10) || 3;
         i++; // skip next arg
       } else if (arg === '--recursive' || arg === '-r') {
         options.recursive = true;
@@ -517,7 +517,7 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
       console.error(MESSAGES.USAGE_EXTRACT_ALL);
       process.exit(1);
     }
-    const level = args[2] ? Number.parseInt(args[2]) : options.level;
+    const level = args[2] ? Number.parseInt(args[2], 10) : options.level;
     await this.extractAllSections(args[1], level, options.output);
   }
 
@@ -645,9 +645,27 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
     // Find all level 2 headings and their positions
     const sections = [];
     let currentSection = null;
+    let inCodeBlock = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      const trimmed = line.trim();
+
+      // Track fenced code blocks and ignore headings within them
+      if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+        if (currentSection) {
+          currentSection.lines.push(line);
+        }
+        inCodeBlock = !inCodeBlock;
+        continue;
+      }
+
+      if (inCodeBlock) {
+        if (currentSection) {
+          currentSection.lines.push(line);
+        }
+        continue;
+      }
 
       // Check for main title (level 1)
       if (line.match(/^# /)) {
@@ -819,8 +837,20 @@ For more information, visit: https://github.com/ksylvan/markdown-tree-parser
    */
   adjustHeadingLevels(content, adjustment) {
     const lines = content.split('\n');
+    let inCodeBlock = false;
 
     const adjustedLines = lines.map((line) => {
+      // Check for code block boundaries (``` or ~~~)
+      if (line.trim().startsWith('```') || line.trim().startsWith('~~~')) {
+        inCodeBlock = !inCodeBlock;
+        return line;
+      }
+
+      // Skip heading adjustment if we're inside a code block
+      if (inCodeBlock) {
+        return line;
+      }
+
       const headingMatch = line.match(PATTERNS.HEADING_LEVEL_1_5);
       if (headingMatch) {
         const [, hashes, rest] = headingMatch;

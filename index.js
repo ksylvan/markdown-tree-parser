@@ -19,9 +19,9 @@ export default MarkdownTreeParser;
 
 // Export additional utilities that might be useful
 export { unified } from 'unified';
-export { visit } from 'unist-util-visit';
-export { selectAll, select } from 'unist-util-select';
 export { find } from 'unist-util-find';
+export { select, selectAll } from 'unist-util-select';
+export { visit } from 'unist-util-visit';
 
 /**
  * Convenience function to create a new parser instance
