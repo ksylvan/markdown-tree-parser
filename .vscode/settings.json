@@ -1,14 +1,36 @@
 {
   "markdownlint.config": {
     "MD033": {
-      "allowed_elements": [
-        "br",
-        "div",
-        "img"
-      ]
+      "allowed_elements": ["br", "div", "img"]
     }
   },
-  "markdownlint.lintWorkspaceGlobs": [
-    "**/*.md"
-  ]
+  "markdownlint.lintWorkspaceGlobs": ["**/*.md"],
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "prettier.configPath": "./.prettierrc",
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.workingDirectories": ["."],
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "files.trimTrailingWhitespace": false
+  }
 }

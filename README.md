@@ -151,13 +151,17 @@ console.log(sectionMarkdown);
 ### Advanced Usage
 
 ```javascript
-import { MarkdownTreeParser, createParser, extractSection } from 'markdown-tree-parser';
+import {
+  MarkdownTreeParser,
+  createParser,
+  extractSection,
+} from 'markdown-tree-parser';
 
 // Create parser with custom options
 const parser = createParser({
-  bullet: '-',      // Use '-' for lists
-  emphasis: '_',    // Use '_' for emphasis
-  strong: '__'      // Use '__' for strong
+  bullet: '-', // Use '-' for lists
+  emphasis: '_', // Use '_' for emphasis
+  strong: '__', // Use '__' for strong
 });
 
 // Extract all sections at level 2
@@ -185,8 +189,7 @@ const codeBlocks = parser.selectAll(tree, 'code');
 
 // Custom search
 const customNode = parser.findNode(tree, (node) => {
-  return node.type === 'heading' &&
-         parser.getHeadingText(node).includes('API');
+  return node.type === 'heading' && parser.getHeadingText(node).includes('API');
 });
 
 // Transform content
@@ -198,7 +201,9 @@ parser.transform(tree, (node) => {
 
 // Get document statistics
 const stats = parser.getStats(tree);
-console.log(`Document has ${stats.wordCount} words and ${stats.headings.total} headings`);
+console.log(
+  `Document has ${stats.wordCount} words and ${stats.headings.total} headings`
+);
 
 // Generate table of contents
 const toc = parser.generateTableOfContents(tree, 3);
@@ -241,7 +246,7 @@ for (let i = 0; i < sections.length; i++) {
 #### Constructor
 
 ```javascript
-new MarkdownTreeParser(options = {})
+new MarkdownTreeParser((options = {}));
 ```
 
 #### Methods
@@ -272,18 +277,18 @@ The library supports powerful CSS-like selectors for searching:
 
 ```javascript
 // Element selectors
-parser.selectAll(tree, 'heading')     // All headings
-parser.selectAll(tree, 'paragraph')  // All paragraphs
-parser.selectAll(tree, 'link')       // All links
+parser.selectAll(tree, 'heading'); // All headings
+parser.selectAll(tree, 'paragraph'); // All paragraphs
+parser.selectAll(tree, 'link'); // All links
 
 // Attribute selectors
-parser.selectAll(tree, 'heading[depth=1]')    // H1 headings
-parser.selectAll(tree, 'heading[depth=2]')    // H2 headings
-parser.selectAll(tree, 'link[url*="github"]') // Links containing "github"
+parser.selectAll(tree, 'heading[depth=1]'); // H1 headings
+parser.selectAll(tree, 'heading[depth=2]'); // H2 headings
+parser.selectAll(tree, 'link[url*="github"]'); // Links containing "github"
 
 // Pseudo selectors
-parser.selectAll(tree, ':first-child')  // First child elements
-parser.selectAll(tree, ':last-child')   // Last child elements
+parser.selectAll(tree, ':first-child'); // First child elements
+parser.selectAll(tree, ':last-child'); // Last child elements
 ```
 
 ## 🧪 Testing
