@@ -4,11 +4,11 @@
  * Basic tests for markdown-tree-parser
  */
 
-import { MarkdownTreeParser, createParser, extractSection } from '../index.js';
-import { MarkdownCLI } from '../bin/md-tree.js'; // Added for checkLinks test
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MarkdownTreeParser, createParser, extractSection } from '../index.js';
+import { MarkdownCLI } from '../bin/md-tree.js'; // Added for checkLinks test
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

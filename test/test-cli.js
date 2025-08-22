@@ -275,6 +275,27 @@ async function runTests() {
     );
   });
 
+  await test('CLI explode handles # inside code blocks', async () => {
+    const bugFile = path.join(testDir, 'truncation.md');
+    const bugContent = `# Bug Doc\n\n## Section\n\nBefore code block.\n\n\`\`\`bash\n# inside code block\necho done\n\`\`\`\n\nAfter code block.\n`;
+    await fs.writeFile(bugFile, bugContent, 'utf-8');
+
+    const outputDir = path.join(testDir, 'truncation-exploded');
+    const result = await runCLI(['explode', bugFile, outputDir]);
+
+    assert(result.code === 0, 'Explode should succeed');
+    const sectionPath = path.join(outputDir, 'section.md');
+    const sectionContent = await fs.readFile(sectionPath, 'utf-8');
+    assert(
+      sectionContent.includes('# inside code block'),
+      'Should keep code block comment'
+    );
+    assert(
+      sectionContent.includes('After code block.'),
+      'Should include text after code block'
+    );
+  });
+
   await test('CLI explode error handling', async () => {
     // Test with non-existent file
     const result = await runCLI(['explode', 'non-existent.md', testDir]);
